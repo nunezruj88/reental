@@ -13,7 +13,7 @@ Aplicación para un LXC Linux con Nginx, accesible desde la red local en **http:
 
 Se revisaron los CSV reales: contienen inversiones por inmueble y distribuciones de rendimientos. El dashboard añade sumas de `inversion`, `distributed`, `reinvested`, `claimed` y `retained`, gráficos por inmueble y mes, y avisos de fechas inconsistentes. Los cálculos usan decimales exactos en el backend y nunca suman `distributed` con su posible desglose. Los valores vacíos o inválidos hacen que el total afectado aparezca como no disponible, no como cero. Los CSV originales no están incluidos en el paquete.
 
-Pendiente confirmar moneda, si `periodo` está en meses y si los campos de retorno son porcentajes. Hasta entonces se muestran sus valores originales, sin previsiones ni beneficio neto. Los recuentos de alquiler son filas, no se presupone que cada fila sea una transacción. Las rutas, usuario y servicio usan el nombre `reental`.
+Los importes están en dólares estadounidenses (USD) y `periodo` se expresa en meses. Si `inicio rendimientos` está vacío (o solo contiene espacios), el rendimiento se obtiene al final del periodo; no se considera una fecha errónea. Las fechas no vacías con formato incorrecto siguen generando un aviso. No se inventa una fecha de vencimiento ni se confunde ausencia de registros con rendimiento cero. Queda pendiente confirmar si los campos de retorno son porcentajes; se muestran sus valores originales, sin previsiones ni beneficio neto. Los recuentos de alquiler son filas, no se presupone que cada fila sea una transacción. Las rutas, usuario y servicio usan el nombre `reental`.
 
 ## Arquitectura y aislamiento
 
