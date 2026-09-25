@@ -1,4 +1,4 @@
-"""Summaries of observed CSV fields; no assumed currency or forecast units."""
+"""Observed amounts in USD; investment periods in months."""
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -47,12 +47,16 @@ def analyze(data):
     for row in buy:
         key = row[pkey].strip()
         linked = groups.get(key, []) if key else []
+        start_text = row['inicio rendimientos'].strip()
         projects.append({'key': key, 'investment': str(number(row['inversion'])) if number(row['inversion']) is not None else None,
                          'distributed': total(linked, 'distributed') if linked else None,
                          'records': len(linked), 'period': row['periodo'], 'returnTotal': row['retorno total'],
-                         'start': row['inicio rendimientos']})
+                         'start': start_text, 'payout': 'at_end' if not start_text else 'from_start'})
+        # A blank date means the return is paid at the end of the period.
+        if not start_text:
+            continue
         try:
-            start = datetime.strptime(row['inicio rendimientos'], '%d/%m/%y').date()
+            start = datetime.strptime(start_text, '%d/%m/%y').date()
             for rental in linked:
                 try:
                     observed = datetime.fromisoformat(rental['date'].replace('Z', '+00:00')).date()
@@ -76,7 +80,7 @@ def analyze(data):
         values = [number(row[f]) for f in amounts]
         if all(v is not None for v in values):
             residual.append(values[0] - sum(values[1:], Decimal(0)))
-    return {'totals': totals, 'projects': projects, 'duplicateKeys': duplicate,
+    return {'currency': 'USD', 'periodUnit': 'months', 'totals': totals, 'projects': projects, 'duplicateKeys': duplicate,
             'monthly': [{'month': m, 'distributed': total(rows, 'distributed')} for m, rows in sorted(monthly.items())],
             'unmatchedDistributed': total(orphan, 'distributed'),
             'componentsReconcile': len(residual) == len(rent) and all(v == 0 for v in residual),
