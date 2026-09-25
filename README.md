@@ -1,6 +1,6 @@
 # Reental
 
-Aplicación preparada para instalar en un LXC Linux con Nginx. Esta entrega no se ha instalado en el servidor: faltan acceso al LXC y el segundo dominio. No se ha modificado `/var/www/periodico` ni su configuración.
+Aplicación para un LXC Linux con Nginx, accesible desde la red local en **http://10.8.1.106:8082**. Si cambia la IP del LXC, usar `http://IP_DEL_LXC:8082`. No requiere dominio, DNS ni Cloudflare Tunnel. La aplicación utiliza su propio sitio Nginx y mantiene separada la web de `/var/www/periodico`.
 
 ## Qué incluye
 
@@ -18,13 +18,15 @@ Pendiente confirmar moneda, si `periodo` está en meses y si los campos de retor
 ## Arquitectura y aislamiento
 
 ```text
-Segundo dominio → Nginx (80/HTTPS o Tunnel) → 127.0.0.1:8091
+Red local → IP_DEL_LXC:8082 (Nginx) → 127.0.0.1:8091
                                             └─ /var/www/reental
 Datos: /var/lib/reental/reental.sqlite3
 Servicio: reental.service · Usuario: reental
 ```
 
-El puerto 8091 distingue el backend de la web existente. El dominio distingue qué sitio elige Nginx. No se añade `default_server`, no se sustituye el sitio predeterminado ni se abre 8091 a Internet. Debe comprobarse que 8091 está libre antes de instalar.
+Nginx escucha en el puerto **8082**, que distingue Reental del periódico. El backend escucha únicamente en **127.0.0.1:8091**; desde otro equipo se accede al 8082. Se conserva la contraseña de Nginx. La configuración no añade ninguna escucha en el puerto 80 ni sustituye el sitio predeterminado. Comprobar que 8082 y 8091 estén libres antes de la primera instalación.
+
+El acceso HTTP está pensado para una red local de confianza. No crear redirecciones de puertos en el router ni rutas públicas de Tunnel para Reental. Si hay firewall en el LXC o Proxmox, permitir TCP 8082 solo desde la red local real; no es necesario exponer 8091. `server_name _` admite el acceso por IP, pero no es una restricción de red.
 
 ## Prueba local (Python 3.10 o posterior)
 
@@ -79,14 +81,15 @@ Ejecutar en el LXC como administrador, después de descargar el repositorio en `
 
 ```sh
 ss -ltnp 'sport = :8091'
+ss -ltnp 'sport = :8082'
 nginx -t
 nginx -T > /root/nginx-antes-reental.txt 2>&1
 ```
 
-Si el puerto está ocupado, elegir otro puerto libre y cambiarlo tanto en `deploy/reental.service` como en `deploy/reental.nginx.conf`. Guardar también una respuesta HTTP de la web existente usando su dominio real, para compararla después.
+Si 8091 está ocupado por otro servicio, elegir un puerto libre y cambiarlo tanto en `deploy/reental.service` como en `proxy_pass` de `deploy/reental.nginx.conf`. Si 8082 está ocupado por otro sitio, cambiar `listen` en la plantilla Nginx y el puerto de la URL de acceso. Si Reental ya está instalado, es normal que sus propios procesos ocupen esos puertos. Guardar también una respuesta HTTP de la web existente usando su dirección habitual, para compararla después.
 
 ```sh
-apt-get install python3-venv apache2-utils
+apt-get install python3-venv apache2-utils curl
 useradd --system --home /var/lib/reental --shell /usr/sbin/nologin reental
 install -d -m 755 /var/www/reental
 cp -r /tmp/reental/. /var/www/reental/
@@ -100,37 +103,48 @@ curl --fail http://127.0.0.1:8091/health
 
 El servicio crea su directorio privado de datos mediante `StateDirectory`. El código permanece propiedad del administrador. Ver registros con `journalctl -u reental -n 50`.
 
-## Segundo sitio Nginx
+## Acceso por IP y puerto con Nginx
 
-1. Cambiar **solo** `reental.example.com` en la plantilla por el dominio nuevo, distinto del periódico. Comprobar con `nginx -T` que ese nombre no está ya configurado. Nginx debe incluir `sites-enabled` (distribuciones Debian/Ubuntu habituales).
-2. Crear una contraseña de acceso (se pide de forma interactiva):
+La plantilla `deploy/reental.nginx.conf` ya contiene `listen 8082;`, `server_name _;` y el proxy hacia `127.0.0.1:8091`. No hay que introducir un dominio ni la IP en esa plantilla. Nginx debe incluir `sites-enabled` (distribuciones Debian/Ubuntu habituales).
+
+Crear la contraseña solo si aún no existe el fichero y activar únicamente el sitio Reental:
 
 ```sh
-htpasswd -c /etc/nginx/reental.htpasswd administrador
+if [ ! -f /etc/nginx/reental.htpasswd ]; then
+    htpasswd -c /etc/nginx/reental.htpasswd administrador
+fi
 chown root:www-data /etc/nginx/reental.htpasswd
 chmod 640 /etc/nginx/reental.htpasswd
 cp /var/www/reental/deploy/reental.nginx.conf /etc/nginx/sites-available/reental
-ln -s /etc/nginx/sites-available/reental /etc/nginx/sites-enabled/reental
+if [ ! -e /etc/nginx/sites-enabled/reental ] && [ ! -L /etc/nginx/sites-enabled/reental ]; then
+    ln -s /etc/nginx/sites-available/reental /etc/nginx/sites-enabled/reental
+fi
 nginx -t
 ```
 
 Usar el grupo real de los trabajadores de Nginx si no es `www-data`. No reutilizar `htpasswd -c` en futuras actualizaciones: recrearía ese fichero de contraseñas.
 
-3. **Solo si `nginx -t` termina correctamente**, recargar sin reiniciar:
+**Solo si `nginx -t` termina correctamente**, recargar sin reiniciar:
 
 ```sh
 systemctl reload nginx
-curl -I -H 'Host: reental.example.com' http://127.0.0.1/
-curl --fail -u administrador -H 'Host: reental.example.com' http://127.0.0.1/health
+curl -I http://127.0.0.1:8082/
+curl --fail -u administrador http://127.0.0.1:8082/health
 ```
 
-La primera petición debe devolver 401 y la segunda, tras introducir contraseña, `{"status":"ok"}`. Sustituir el dominio también en las pruebas. Confirmar que el periódico sigue respondiendo como antes y probar una carga de CSV desde el navegador.
+La primera petición debe devolver 401 y la segunda, tras introducir contraseña, `{"status":"ok"}`. Desde otro equipo de la red abrir **http://10.8.1.106:8082** (o la IP actual del LXC) e iniciar sesión con `administrador` y su contraseña. Confirmar que el periódico sigue respondiendo como antes y probar una carga de CSV.
 
-## Cloudflare Tunnel o HTTPS
+## Actualizar una instalación existente al acceso local
 
-Si ya hay Cloudflare Tunnel, añadir una ruta de hostname público con el nuevo dominio hacia `http://127.0.0.1:80` cuando el túnel corre dentro del mismo LXC, o hacia `http://10.8.1.106:80` si corre fuera y esa sigue siendo la IP del LXC. El encabezado HTTP Host debe ser el dominio nuevo. Mantener las rutas existentes y el cierre de reglas del túnel. No apuntar el túnel directamente al 8091: se omitiría la autenticación de Nginx. Acceder por HTTPS en el dominio público.
+Si el acceso por `IP:8082` ya funciona con la misma configuración, no hace falta cambiar el servicio ni volver a crear usuario, contraseña o base de datos. Para aplicar la plantilla del repositorio a una instalación que aún usa el dominio, descargar la versión actual en `/tmp/reental` siguiendo la sección de Git y ejecutar:
 
-Si no hay Tunnel, configurar DNS y un certificado HTTPS para el dominio nuevo antes de enviar credenciales o datos por Internet. La plantilla suministrada cubre el origen HTTP detrás de Tunnel; no incluye un certificado inventado ni cambia TLS del periódico.
+```sh
+cp -a /etc/nginx/sites-available/reental /etc/nginx/reental.before-lan.conf
+cp /tmp/reental/deploy/reental.nginx.conf /etc/nginx/sites-available/reental
+nginx -t && systemctl reload nginx
+```
+
+Si la comprobación falla, no recargar Nginx: restaurar la copia con `cp /etc/nginx/reental.before-lan.conf /etc/nginx/sites-available/reental` y revisar el error. La actualización de esta configuración no modifica datos ni archivos del periódico. Si se había publicado Reental mediante un Tunnel o una redirección del router, retirar únicamente esa ruta pública; conservar las rutas de los demás servicios.
 
 ## Copia y retirada
 
