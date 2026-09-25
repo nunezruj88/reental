@@ -37,9 +37,45 @@ python app.py
 
 Abrir `http://127.0.0.1:8091`. El servidor local es solo para pruebas; en Linux se usa Gunicorn. Los archivos CSV no se sirven como archivos públicos. No usar datos reales en una publicación sin protección de acceso y HTTPS.
 
+## Obtener el repositorio desde el LXC
+
+Abrir una consola dentro del LXC que aloja Nginx, desde el panel del servidor o por SSH con su dirección y usuario habituales. Ejecutar los siguientes comandos como `root` (si se entra con otro usuario administrador, ejecutar primero `sudo -i`).
+
+Instalar Git y descargar la rama `main` del repositorio:
+
+```sh
+apt-get update
+apt-get install -y git ca-certificates
+git clone --branch main https://github.com/nunezruj88/reental.git /tmp/reental
+cd /tmp/reental
+git log -1 --oneline
+ls
+```
+
+Deberían aparecer `README.md`, `app.py`, `finance.py`, `requirements.txt` y las carpetas `static`, `deploy` y `tests`. La descarga se hace en `/tmp/reental`; no modifica `/var/www/periodico` ni activa ningún sitio de Nginx. `/tmp` es una ubicación temporal: la instalación siguiente copia el código a `/var/www/reental`.
+
+Si `/tmp/reental` ya existe, no borrarlo ni repetir la clonación encima. Comprobar primero que corresponde a este repositorio y que no hay cambios locales:
+
+```sh
+git -C /tmp/reental remote -v
+git -C /tmp/reental status --short
+```
+
+Si el remoto es `https://github.com/nunezruj88/reental.git` y el estado está limpio, actualizar esa copia con:
+
+```sh
+git -C /tmp/reental pull --ff-only origin main
+```
+
+Si hay cambios locales o el directorio corresponde a otro proyecto, conservarlo y revisar antes de continuar. Actualizar `/tmp/reental` solo actualiza la copia descargada, no la aplicación instalada.
+
+Si el repositorio es público, la clonación por HTTPS no requiere iniciar sesión. Si es privado, GitHub requiere una cuenta con acceso y un token de acceso personal al pedir la contraseña; la contraseña normal de GitHub no sirve. No incluir el token en la URL ni guardarlo en este README.
+
+Continuar con la sección siguiente para instalar lo descargado.
+
 ## Instalación en Debian/Ubuntu: revisar primero
 
-Ejecutar en el LXC como administrador. Antes, copiar esta carpeta a `/tmp/reental`. Los comandos de instalación presuponen que las rutas y el usuario de Reental no existen todavía; si existen, revisar antes de copiar. No tocar los archivos del periódico.
+Ejecutar en el LXC como administrador, después de descargar el repositorio en `/tmp/reental` siguiendo la sección anterior. Los comandos de instalación presuponen que las rutas y el usuario de Reental no existen todavía; si existen, revisar antes de copiar. No tocar los archivos del periódico.
 
 ```sh
 ss -ltnp 'sport = :8091'
