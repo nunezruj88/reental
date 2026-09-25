@@ -23,6 +23,7 @@ function amountBars(target,items){
  for(const item of items){const row=el('div',undefined,'bar-row'),line=el('div',undefined,'bar-label');line.append(el('span',item.label),el('strong',amount(item.value)));row.append(line);if(item.value!==null){const p=el('progress');p.max=max;p.value=Math.abs(Number(item.value));p.setAttribute('aria-label',`${item.label}: ${amount(item.value)}`);row.append(p);}target.append(row);}
 }
 function renderFinancial(){
+ $('amountReading')?.remove();
  const box=$('financial');box.replaceChildren();box.hidden=!data?.financial;
  if(!data?.financial){$('economicNote').textContent='Los indicadores económicos requieren las columnas de inversión y rendimientos. No se deducen a partir de nombres distintos.';return;}
  const f=data.financial,t=f.totals;
@@ -30,7 +31,7 @@ function renderFinancial(){
  const cards=el('div',undefined,'kpis');
  for(const [title,value,note] of [['Inversión registrada',t.inversion,'Suma de inversion'],['Rendimiento distribuido',t.distributed,'Suma de distributed'],['Reinvertido',t.reinvested,'Suma de reinvested'],['Reclamado (claimed)',t.claimed,'Suma de claimed']]){const c=el('div',undefined,'kpi');c.append(el('span',title),el('strong',amount(value)),el('small',note));cards.append(c);}box.append(cards);
  const note=el('article',undefined,'panel');note.append(el('h2','Lectura de los importes'),el('p','Moneda no indicada en los CSV. Los importes conservan hasta seis decimales. Retained: '+amount(t.retained)+'. Distributed, retained, reinvested y claimed se muestran por separado; no se suman entre sí.'),el('p',f.componentsReconcile?'En cada registro, distributed coincide con retained + reinvested + claimed.':'El desglose no coincide en todos los registros o contiene valores no numéricos; revisa el detalle.'),el('p','No se calcula beneficio neto, rentabilidad anual realizada ni previsiones hasta confirmar moneda, unidades de periodo y porcentajes.'));
- for(const warning of f.warnings)note.append(el('p',warning,'data-warning'));box.append(note);
+ for(const warning of f.warnings)note.append(el('p',warning,'data-warning'));note.id='amountReading';$('upload').append(note);
  const charts=el('div',undefined,'two');
  const a=el('article',undefined,'panel');a.append(el('h2','Distribuido por inversión'));
  if(f.duplicateKeys)a.append(el('p','No disponible: claves repetidas en compras.'));else amountBars(a,f.projects.map(p=>({label:p.key,value:p.distributed})));
