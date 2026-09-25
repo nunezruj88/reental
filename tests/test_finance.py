@@ -11,6 +11,25 @@ def dataset():
 
 
 class FinanceTests(unittest.TestCase):
+    def test_blank_start_means_payment_at_end(self):
+        d = dataset()
+        d['compras']['rows'][0][2] = '  '
+        f = analyze(d)
+        self.assertEqual(f['currency'], 'USD')
+        self.assertEqual(f['periodUnit'], 'months')
+        self.assertEqual(f['projects'][0]['payout'], 'at_end')
+        self.assertEqual(f['projects'][0]['start'], '')
+        self.assertEqual(f['projects'][1]['payout'], 'from_start')
+        self.assertEqual(f['warnings'], [])
+        self.assertEqual(f['totals']['distributed'], '1.698861')
+
+    def test_invalid_nonempty_start_still_warns(self):
+        d = dataset()
+        d['compras']['rows'][0][2] = 'not a date'
+        f = analyze(d)
+        self.assertEqual(f['projects'][0]['payout'], 'from_start')
+        self.assertTrue(any('fecha de inicio' in w for w in f['warnings']))
+
     def test_exact_totals_and_dates(self):
         f = analyze(dataset())
         self.assertEqual(Decimal(f['totals']['inversion']), Decimal('899.7'))
