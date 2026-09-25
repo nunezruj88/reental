@@ -1,0 +1,22 @@
+[Unit]
+Description=Reental CSV dashboard
+After=network.target
+
+[Service]
+User=reental
+Group=reental
+WorkingDirectory=/var/www/reental
+Environment=REENTAL_DB=/var/lib/reental/reental.sqlite3
+ExecStart=/var/www/reental/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8091 --timeout 90 --access-logfile - app:application
+Restart=on-failure
+RestartSec=5
+StateDirectory=reental
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
