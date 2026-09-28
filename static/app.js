@@ -23,6 +23,7 @@ function amountBars(target,items){
  for(const item of items){const row=el('div',undefined,'bar-row'),line=el('div',undefined,'bar-label');line.append(el('span',item.label),el('strong',amount(item.value)));row.append(line);if(item.value!==null){const p=el('progress');p.max=max;p.value=Math.abs(Number(item.value));p.setAttribute('aria-label',`${item.label}: ${amount(item.value)}`);row.append(p);}target.append(row);}
 }
 function renderFinancial(){
+ renderCountries();
  $('amountReading')?.remove();
  const box=$('financial');box.replaceChildren();box.hidden=!data?.financial;
  if(!data?.financial){$('economicNote').textContent='Los indicadores económicos requieren las columnas de inversión y rendimientos. No se deducen a partir de nombres distintos.';return;}
@@ -41,4 +42,33 @@ function renderFinancial(){
  const wrap=el('div',undefined,'table-wrap');
  wrap.append(table(['Inmueble','Inversión','Distribuido registrado','Registros','Inicio rendimientos','Periodo (meses)','Retorno total (origen)'],f.projects.map(p=>[p.key,amount(p.investment),p.records?amount(p.distributed):'Sin registros',String(p.records),p.start||'Al final del periodo',p.period,p.returnTotal]),'compras'));
  panel.append(wrap);box.append(panel);
+}
+
+function countryCounts(purchases){
+ const normalize=value=>value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');
+ const column=purchases.headers.findIndex(h=>normalize(h)==='pais');
+ if(column<0)return null;
+ const counts=new Map();
+ for(const row of purchases.rows){const raw=row[column].trim().replace(/\s+/g,' '),key=normalize(raw)||'__sin_pais__';const entry=counts.get(key)||{country:raw?raw.charAt(0).toLocaleUpperCase('es')+raw.slice(1).toLocaleLowerCase('es'):'Sin país',count:0};entry.count++;counts.set(key,entry);}
+ return [...counts.values()].sort((a,b)=>b.count-a.count||a.country.localeCompare(b.country,'es'));
+}
+function renderCountries(){
+ $('countryChart')?.remove();
+ if(!data)return;
+ const panel=el('article',undefined,'panel');panel.id='countryChart';panel.append(el('h2','Inversiones por país'));
+ const items=countryCounts(data.compras);
+ if(items===null){panel.append(el('p','Carga compras_reental.csv con la columna pais para ver la distribución por países.'));$('insights').prepend(panel);return;}
+ const total=items.reduce((sum,item)=>sum+item.count,0);
+ panel.append(el('p',`${fmt(total)} inversiones · Cada fila de compras cuenta una vez, independientemente de sus registros de alquiler.`));
+ if(!total){panel.append(el('p','No hay inversiones para representar.'));$('insights').prepend(panel);return;}
+ const layout=el('div',undefined,'two'),svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('viewBox','0 0 320 240');svg.setAttribute('width','100%');svg.setAttribute('height','240');svg.setAttribute('role','img');svg.setAttribute('aria-label',items.map(x=>`${x.country}: ${x.count} inversiones`).join('; '));
+ const body=el('tbody'),legend=el('table'),thead=el('thead'),head=el('tr');['Color','País','Inversiones','Porcentaje'].forEach(h=>head.append(el('th',h)));thead.append(head);
+ let start=-Math.PI/2;
+ items.forEach((item,i)=>{const angle=item.count/total*2*Math.PI,end=start+angle,color=`hsl(${(155+i*137.508)%360} 48% 40%)`;const slice=document.createElementNS(svg.namespaceURI,items.length===1?'circle':'path');
+ if(items.length===1){slice.setAttribute('cx','160');slice.setAttribute('cy','120');slice.setAttribute('r','104');}else{slice.setAttribute('d',`M160 120 L${160+104*Math.cos(start)} ${120+104*Math.sin(start)} A104 104 0 ${angle>Math.PI?1:0} 1 ${160+104*Math.cos(end)} ${120+104*Math.sin(end)} Z`);}
+ slice.setAttribute('fill',color);slice.setAttribute('stroke','white');slice.setAttribute('stroke-width','2');const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=`${item.country}: ${fmt(item.count)} (${new Intl.NumberFormat('es-ES',{style:'percent',maximumFractionDigits:1}).format(item.count/total)})`;slice.append(title);svg.append(slice);start=end;
+ const row=el('tr'),swatch=el('td'),icon=document.createElementNS(svg.namespaceURI,'svg'),dot=document.createElementNS(svg.namespaceURI,'circle');icon.setAttribute('width','16');icon.setAttribute('height','16');icon.setAttribute('aria-hidden','true');dot.setAttribute('cx','8');dot.setAttribute('cy','8');dot.setAttribute('r','7');dot.setAttribute('fill',color);icon.append(dot);swatch.append(icon);row.append(swatch,el('td',item.country),el('td',fmt(item.count)),el('td',new Intl.NumberFormat('es-ES',{style:'percent',maximumFractionDigits:1}).format(item.count/total)));body.append(row);
+ });
+ legend.append(thead,body);const wrap=el('div',undefined,'table-wrap');wrap.append(legend);layout.append(svg,wrap);panel.append(layout);$('insights').prepend(panel);
 }
