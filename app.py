@@ -105,13 +105,24 @@ def application(env, start_response):
             if not 0 < size <= LIMIT:
                 raise ValueError('Carga vacía o demasiado grande (máximo 30 MB).')
             payload = json.loads(env['wsgi.input'].read(size))
-            data = {}
+            if not isinstance(payload, dict) or not payload or set(payload) - {'compras', 'alquiler'}:
+                raise ValueError('Selecciona un archivo de inversiones o de alquiler.')
+            parsed = {}
             for field, name in [('compras', 'compras_reental.csv'), ('alquiler', 'alquiler.csv')]:
-                data[field] = parse_csv(base64.b64decode(payload[field], validate=True), name)
-            data['updated'] = datetime.now(timezone.utc).isoformat()
-            data['summary'] = summarize(data)
-            data['financial'] = analyze(data)
+                if field in payload:
+                    parsed[field] = parse_csv(base64.b64decode(payload[field], validate=True), name)
             with connection() as con:
+                # Serialize read/merge/write so independent imports cannot overwrite each other.
+                con.execute('BEGIN IMMEDIATE')
+                row = con.execute('SELECT body FROM dataset WHERE id=1').fetchone()
+                data = json.loads(row[0]) if row else {
+                    field: {'headers': [], 'rows': [], 'encoding': '', 'delimiter': ''}
+                    for field in ('compras', 'alquiler')
+                }
+                data.update(parsed)
+                data['updated'] = datetime.now(timezone.utc).isoformat()
+                data['summary'] = summarize(data)
+                data['financial'] = analyze(data)
                 con.execute('INSERT OR REPLACE INTO dataset VALUES (1, ?)', (json.dumps(data, ensure_ascii=False),))
             result = data
         elif path == '/api/data' and method == 'GET':

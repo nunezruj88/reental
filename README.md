@@ -5,7 +5,7 @@ Aplicación para un LXC Linux con Nginx, accesible desde la red local en **http:
 ## Qué incluye
 
 - Resumen responsive con recuentos, cobertura de relaciones y ranking por número de registros de alquiler.
-- Carga conjunta y validada de ambos CSV; reemplazo atómico en SQLite, conservando el conjunto anterior ante errores de validación.
+- Carga independiente de inversiones y rendimientos; cada importación sustituye solo su tipo de registros en SQLite y conserva el otro archivo. Ante errores de validación se conservan todos los datos.
 - Explorador con todas las columnas originales, búsqueda, paginación y grupos de registros relacionados.
 - Compras: clave de primera columna. Alquiler: texto anterior al primer `#` de primera columna. Se recortan espacios exteriores, se conservan ceros iniciales y mayúsculas. Las claves vacías no coinciden. Los duplicados se muestran y no multiplican los recuentos.
 - UTF-8/BOM o Windows-1252, separadores `, ; TAB |`, valores entrecomillados y multilínea. Se exige cabecera única y no vacía. Máximo 10 MB, 50.000 filas y 150 columnas por archivo.
@@ -148,7 +148,7 @@ Si la comprobación falla, no recargar Nginx: restaurar la copia con `cp /etc/ng
 
 ## Copia y retirada
 
-Antes de reemplazar datos importantes, hacer copia consistente con Python/SQLite backup o con `sqlite3 /var/lib/reental/reental.sqlite3 ".backup '/ruta/privada/reental-backup.sqlite3'"`. Mantener privada la copia. La importación sustituye el conjunto anterior y no guarda histórico.
+Antes de reemplazar datos importantes, hacer copia consistente con Python/SQLite backup o con `sqlite3 /var/lib/reental/reental.sqlite3 ".backup '/ruta/privada/reental-backup.sqlite3'"`. Mantener privada la copia. Cada importación sustituye solo el archivo correspondiente (inversiones o rendimientos), conserva el otro y no guarda histórico.
 
 Para desactivar únicamente Reental: quitar el enlace `/etc/nginx/sites-enabled/reental`, ejecutar `nginx -t` y, si pasa, recargar Nginx; después `systemctl disable --now reental`. Conservar el directorio de datos. No eliminar ni editar otros sitios.
 
