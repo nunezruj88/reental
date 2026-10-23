@@ -64,6 +64,45 @@ class Tests(unittest.TestCase):
         self.assertEqual(status, '200 OK')
         self.assertEqual(result['summary']['purchases'], 0)
 
+    def test_independent_first_imports(self):
+        for source in ('compras', 'alquiler'):
+            with self.subTest(source=source):
+                app.DB = Path(self.temp.name) / (source + '.sqlite3')
+                payload = self.payload('id,titulo\nA,Uno\n', 'id,valor\nA#1,2\n')
+                status, result = self.request('/api/import', {source: payload[source]})
+                other = 'alquiler' if source == 'compras' else 'compras'
+                self.assertEqual(status, '200 OK')
+                self.assertEqual(len(result[source]['rows']), 1)
+                self.assertEqual(result[other]['headers'], [])
+                self.assertEqual(result[other]['rows'], [])
+                self.assertIsNone(result['financial'])
+                self.assertEqual(self.request('/api/data')[1], result)
+
+    def test_independent_replacement_preserves_other_file(self):
+        payload = self.payload('id,titulo\nA,Uno\n', 'id,valor\nA#1,2\n')
+        self.request('/api/import', {'alquiler': payload['alquiler']})
+        status, linked = self.request('/api/import', {'compras': payload['compras']})
+        self.assertEqual(status, '200 OK')
+        self.assertEqual(linked['summary']['matched'], 1)
+        for source in ('compras', 'alquiler'):
+            other = 'alquiler' if source == 'compras' else 'compras'
+            before = app.current()
+            replacement = self.payload('id,titulo\nB,Dos\n', 'id,valor\nB#1,3\n')
+            status, result = self.request('/api/import', {source: replacement[source]})
+            self.assertEqual(status, '200 OK')
+            self.assertEqual(result[other], before[other])
+            self.assertEqual(len(result[source]['rows']), 1)
+            self.assertTrue(result[source]['rows'][0][0].startswith('B'))
+            self.assertEqual(self.request('/api/data')[1], result)
+
+    def test_failed_single_import_preserves_all_data(self):
+        self.request('/api/import', self.payload('id,titulo\nA,Uno\n', 'id,valor\nA#1,2\n'))
+        before = app.current()
+        for payload in ({}, [], {'unknown': 'x'}, {'compras': ''},
+                        {'alquiler': base64.b64encode(b'id,x\nA,2,3').decode()}):
+            self.assertEqual(self.request('/api/import', payload)[0], '400 Bad Request')
+            self.assertEqual(app.current(), before)
+
     def test_no_static_traversal(self):
         self.assertEqual(self.request('/../app.py')[0], '404 Not Found')
 
