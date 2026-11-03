@@ -7,7 +7,7 @@ document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>show(b.dataset
 document.querySelector('.brand').onclick=()=>show('dashboard');
 async function api(url,options){const r=await fetch(url,options);let value;try{value=await r.json();}catch{throw Error('No se pudo procesar la respuesta del servidor.');}if(!r.ok)throw Error(value.error||'Error al cargar los datos.');return value;}
 function bar(target,label,value,total){const row=el('div',undefined,'bar-row'),line=el('div',undefined,'bar-label');line.append(el('span',label),el('strong',fmt(value)));const p=el('progress');p.max=Math.max(1,total);p.value=value;p.setAttribute('aria-label',`${label}: ${value}`);row.append(line,p);target.append(row);}
-function render(){ renderPurchaseReturns(); renderMaturities(); renderPortfolio(); renderOrphans(); renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
+function render(){ renderInvestmentStatus(); renderPurchaseReturns(); renderMaturities(); renderPortfolio(); renderOrphans(); renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
 function getKey(row,source){return(source==='alquiler'?row[0].split('#')[0]:row[0]).trim();}
 function table(headers,rows,source,actions=true){const t=el('table'),head=el('thead'),tr=el('tr');headers.forEach(h=>tr.append(el('th',h)));if(actions)tr.append(el('th','Relación'));head.append(tr);const body=el('tbody');rows.forEach(row=>{const r=el('tr');row.forEach((v,i)=>{const display=displayValue(headers[i],v);const c=el('td',display);c.title=display;r.append(c);});if(actions){const c=el('td'),b=el('button','Ver relación');b.onclick=()=>{show('detail');related(getKey(row,source));};c.append(b);r.append(c);}body.append(r);});t.append(head,body);return t;}
 function renderTable(){const source=$('source').value;$('table').replaceChildren();if(!data){$('schema').textContent='Carga un CSV de inversiones o rendimientos para explorar los registros.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const d=data[source];if(!d.headers.length){$('schema').textContent='Todavía no has cargado este archivo.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const q=$('search').value.toLocaleLowerCase(),rows=d.rows.filter(r=>r.some(v=>v.toLocaleLowerCase().includes(q)));const pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages-1);$('schema').textContent=`${d.headers.length} columnas · ${fmt(rows.length)} registros · ${d.encoding}`;$('table').append(table(d.headers,rows.slice(page*50,page*50+50),source));$('pageLabel').textContent=`Página ${page+1} de ${pages}`;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;}
@@ -81,10 +81,10 @@ function renderCountries(){
  if(!data)return;
  const panel=el('article',undefined,'panel');panel.id='countryChart';panel.append(el('h2','Inversiones por país'));
  const items=countryCounts(data.compras);
- if(items===null){panel.append(el('p','Carga compras_reental.csv con la columna pais para ver la distribución por países.'));$('insights').prepend(panel);return;}
+ if(items===null){panel.append(el('p','Carga compras_reental.csv con la columna pais para ver la distribución por países.'));$('investmentStatus').after(panel);return;}
  const total=items.reduce((sum,item)=>sum+item.count,0);
  panel.append(el('p',`${fmt(total)} inversiones · Cada fila de compras cuenta una vez, independientemente de sus registros de alquiler.`));
- if(!total){panel.append(el('p','No hay inversiones para representar.'));$('insights').prepend(panel);return;}
+ if(!total){panel.append(el('p','No hay inversiones para representar.'));$('investmentStatus').after(panel);return;}
  const layout=el('div',undefined,'two'),svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
  svg.setAttribute('viewBox','0 0 320 240');svg.setAttribute('width','100%');svg.setAttribute('height','240');svg.setAttribute('role','img');svg.setAttribute('aria-label',items.map(x=>`${x.country}: ${x.count} inversiones`).join('; '));
  const body=el('tbody'),legend=el('table'),thead=el('thead'),head=el('tr');['Color','País','Inversiones','Porcentaje'].forEach(h=>head.append(el('th',h)));thead.append(head);
@@ -94,7 +94,7 @@ function renderCountries(){
  slice.setAttribute('fill',color);slice.setAttribute('stroke','white');slice.setAttribute('stroke-width','2');const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=`${item.country}: ${fmt(item.count)} (${new Intl.NumberFormat('es-ES',{style:'percent',maximumFractionDigits:1}).format(item.count/total)})`;slice.append(title);svg.append(slice);start=end;
  const row=el('tr'),swatch=el('td'),icon=document.createElementNS(svg.namespaceURI,'svg'),dot=document.createElementNS(svg.namespaceURI,'circle');icon.setAttribute('width','16');icon.setAttribute('height','16');icon.setAttribute('aria-hidden','true');dot.setAttribute('cx','8');dot.setAttribute('cy','8');dot.setAttribute('r','7');dot.setAttribute('fill',color);icon.append(dot);swatch.append(icon);row.append(swatch,el('td',item.country),el('td',fmt(item.count)),el('td',new Intl.NumberFormat('es-ES',{style:'percent',maximumFractionDigits:1}).format(item.count/total)));body.append(row);
  });
- legend.append(thead,body);const wrap=el('div',undefined,'table-wrap');wrap.append(legend);layout.append(svg,wrap);panel.append(layout);$('insights').prepend(panel);
+ legend.append(thead,body);const wrap=el('div',undefined,'table-wrap');wrap.append(legend);layout.append(svg,wrap);panel.append(layout);$('investmentStatus').after(panel);
 }
 
 function displayValue(header,value){
@@ -240,4 +240,37 @@ function renderPurchaseReturns(){
   }
   return list;
  });
+}
+
+function statusRing(value,progress,label){
+ const wrap=el('div',undefined,'status-ring');
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('viewBox','0 0 120 120');svg.setAttribute('role','img');svg.setAttribute('aria-label',label);
+ for(const foreground of [false,true]){
+  const circle=document.createElementNS(svg.namespaceURI,'circle');
+  for(const [name,value] of Object.entries({cx:'60',cy:'60',r:'49',fill:'none','stroke-width':'9'}))circle.setAttribute(name,value);
+  circle.setAttribute('stroke',foreground?'#4b9471':'#e7efe9');
+  if(foreground){circle.setAttribute('pathLength','100');circle.setAttribute('stroke-dasharray',(Math.max(0,Math.min(1,progress))*100)+' 100');circle.setAttribute('transform','rotate(-90 60 60)');}
+  svg.append(circle);
+ }
+ wrap.append(svg,el('strong',value));return wrap;
+}
+function renderInvestmentStatus(){
+ const section=$('investmentStatus'),cards=$('investmentStatusCards');
+ cards.replaceChildren();section.hidden=!data;
+ if(!data)return;
+ const s=data.investmentStatus;
+ if(!s){section.hidden=true;return;}
+ const total=el('article',undefined,'kpi investment-status-card');
+ total.append(el('h3','Total de inversiones'),statusRing(fmt(s.total),s.total?1:0,fmt(s.total)+' inversiones cargadas'),el('p','Cada registro de compras cuenta una inversión.'));
+ const next=el('article',undefined,'kpi investment-status-card');
+ next.append(el('h3','Próxima en finalizar'));
+ if(s.next){
+  const item=s.next,when=item.daysRemaining===0?'Hoy':fmt(item.daysRemaining)+' días';
+  next.append(statusRing(when,item.progress,'Próxima finalización: '+when),el('h4',item.key||'Compra sin identificador'),el('p',item.date.split('-').reverse().join('/')+' · Registro '+item.record));
+ }else next.append(statusRing('—',0,'Sin próxima fecha de finalización'),el('p',s.unknown?'No hay próximas fechas calculables. Revisa las inversiones sin fecha.':'No hay inversiones pendientes de finalizar.'));
+ const expired=el('article',undefined,'kpi investment-status-card');
+ expired.append(el('h3','Inversiones vencidas'),statusRing(fmt(s.expired),s.total?s.expired/s.total:0,fmt(s.expired)+' de '+fmt(s.total)+' inversiones con fecha de finalización pasada'),el('p','Fecha de finalización anterior a hoy.'));
+ cards.append(total,next,expired);
+ $('investmentStatusNote').textContent='A fecha de '+s.asOf.split('-').reverse().join('/')+'.'+(s.unknown?' '+fmt(s.unknown)+' inversiones sin fecha calculable: se incluyen en el total, pero no en vencidas ni próximas. Revisa los avisos en Cargar archivos.':'');
 }

@@ -129,6 +129,15 @@ class Tests(unittest.TestCase):
         self.assertEqual(result['purchaseReturns'][0]['key'], 'A')
         self.assertEqual(result['purchaseReturns'][0]['percentage'], '40.0')
 
+    def test_investment_status_on_import_and_reload(self):
+        payload = self.payload('id;rendimiento;inicio proyecto;periodo\nA;bullet;01/01/2000;12\nB;bullet;01/01/2099;12\nC;bullet;;12\n', '')
+        status, result = self.request('/api/import', {'compras': payload['compras']})
+        self.assertEqual(status, '200 OK')
+        summary = result['investmentStatus']
+        self.assertEqual((summary['total'], summary['expired'], summary['unknown']), (3, 1, 1))
+        self.assertEqual(summary['next']['key'], 'B')
+        self.assertEqual(self.request('/api/data')[1]['investmentStatus'], summary)
+
     def test_no_static_traversal(self):
         self.assertEqual(self.request('/../app.py')[0], '404 Not Found')
 
