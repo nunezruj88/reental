@@ -1,6 +1,6 @@
 import unittest
 from decimal import Decimal
-from finance import analyze, number
+from finance import analyze, number, portfolio_totals
 
 
 def dataset():
@@ -60,3 +60,30 @@ class FinanceTests(unittest.TestCase):
 
     def test_unknown_schema(self):
         self.assertIsNone(analyze({'compras': {'headers': []}, 'alquiler': {'headers': []}}))
+
+
+class PortfolioTotalsTests(unittest.TestCase):
+    def test_independent_files_and_minimal_headers(self):
+        data = {'compras': {'headers': ['id', 'inversion'], 'rows': [['A', '100,10'], ['B', '200.20']]},
+                'alquiler': {'headers': [], 'rows': []}}
+        self.assertEqual(portfolio_totals(data), {'inversion': '300.30', 'reinvested': None, 'claimed': None})
+        data['compras'] = {'headers': [], 'rows': []}
+        data['alquiler'] = {'headers': ['id', 'reinvested', 'claimed'], 'rows': [['Z#1', '2.5', '3,25'], ['Z#2', '1', '0']]}
+        self.assertEqual(portfolio_totals(data), {'inversion': None, 'reinvested': '3.5', 'claimed': '3.25'})
+
+    def test_invalid_values_affect_only_their_total(self):
+        data = dataset()
+        data['compras']['rows'][0][1] = ''
+        data['alquiler']['rows'][0][4] = 'invalid'
+        result = portfolio_totals(data)
+        self.assertIsNone(result['inversion'])
+        self.assertIsNone(result['claimed'])
+        self.assertEqual(result['reinvested'], '1.698861')
+
+    def test_totals_do_not_multiply_with_relations(self):
+        data = dataset()
+        data['alquiler']['rows'].append(['Z#1', '2', '0', '1', '1', '2026-10-01'])
+        result = portfolio_totals(data)
+        self.assertEqual(result['inversion'], '899.7')
+        self.assertEqual(result['reinvested'], '2.698861')
+        self.assertEqual(result['claimed'], '1')
