@@ -226,7 +226,7 @@ function renderPurchaseReturns(){
   for(const item of rows){
    const row=el('li'),heading=el('div',undefined,'bar-label');
    heading.append(el('strong',item.key||'Compra sin identificador'),el('strong',percent(item.percentage)));
-   row.append(heading,el('p',amount(item.amount)+' · Registro '+item.record));
+   row.append(heading,el('p','Importe de compra: '+amount(item.capital)+' · Rendimiento obtenido: '+amount(item.amount)+' · Registro '+item.record));
    if(item.percentage!==null){
     const value=Number(item.percentage),track=el('div',undefined,'return-track'),fill=el('div',undefined,value<0?'return-fill negative':'return-fill');
     track.setAttribute('role','img');track.setAttribute('aria-label','Rendimiento: '+percent(item.percentage)+' · '+amount(item.amount));

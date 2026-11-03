@@ -12,12 +12,14 @@ class PurchaseReturnTests(unittest.TestCase):
         result = purchase_returns(data)
         self.assertEqual([r['key'] for r in result], ['B', 'A', 'C'])
         self.assertEqual([r['amount'] for r in result], ['20', '150', '-5'])
+        self.assertEqual([r['capital'] for r in result], ['100', '1000', '100'])
         self.assertEqual([r['percentage'] for r in result], ['20.0', '15.00', '-5.00'])
 
     def test_decimal_comma_precision_and_explicit_zero(self):
         result = purchase_returns(dataset([['A', '0,30'], ['B', '100']],
                                           [['A#1', '0.01'], ['A#2', '0,02'], ['B#1', '0']]))
         self.assertEqual(result[0]['amount'], '0.03')
+        self.assertEqual(result[0]['capital'], '0.30')
         self.assertEqual(result[0]['percentage'], '10.0')
         self.assertEqual(result[1]['percentage'], '0')
 
@@ -29,6 +31,7 @@ class PurchaseReturnTests(unittest.TestCase):
             self.assertIn('Capital', result['reason'])
         result = purchase_returns(dataset([['A']], [['A#1', '10']], ['id']))[0]
         self.assertIsNone(result['percentage'])
+        self.assertIsNone(result['capital'])
 
     def test_no_records_is_not_zero_and_invalid_amount_not_partial_total(self):
         result = purchase_returns(dataset([['A', '100'], ['B', '100']],
@@ -44,6 +47,7 @@ class PurchaseReturnTests(unittest.TestCase):
         result = purchase_returns(dataset([['A', '100'], [' A ', '200'], ['', '100']],
                                           [['A#1', '10'], ['#1', '5']]))
         self.assertTrue(all(r['amount'] is None for r in result))
+        self.assertEqual([r['capital'] for r in result], ['100', '200', '100'])
         self.assertIn('repetido', result[0]['reason'])
         self.assertIn('vacío', result[2]['reason'])
 

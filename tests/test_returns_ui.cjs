@@ -29,14 +29,16 @@ function setup(){
 test('ranked chart shows percentage and USD including negative and unavailable values',()=>{
  const s=setup(),chart=s.context.document.getElementById('purchaseReturnsChart');
  s.context.fixture={purchaseReturns:[
-  {key:'A',record:1,amount:'20',percentage:'10',reason:''},
-  {key:'B',record:2,amount:'-5',percentage:'-2.5',reason:''},
-  {key:'C',record:3,amount:null,percentage:null,reason:'Sin registros de alquiler relacionados.'}
+  {key:'A',record:1,capital:'200',amount:'20',percentage:'10',reason:''},
+  {key:'B',record:2,capital:'200',amount:'-5',percentage:'-2.5',reason:''},
+  {key:'C',record:3,capital:null,amount:null,percentage:null,reason:'Sin registros de alquiler relacionados.'}
  ]};
  vm.runInContext('data=fixture;renderPurchaseReturns()',s.context);
  const rows=chart.children[1].children[0].children;
  assert.equal(rows[0].children[0].children[1].textContent,'10,00 %');
- assert.match(rows[0].children[1].textContent,/USD/);
+ assert.match(rows[0].children[1].textContent,/Importe de compra: 200,00/);
+ assert.match(rows[0].children[1].textContent,/Rendimiento obtenido: 20,00/);
+ assert.match(rows[2].children[1].textContent,/Importe de compra: No disponible/);
  assert.equal(rows[1].children[2].children[0].className,'return-fill negative');
  assert.equal(rows[2].children[0].children[1].textContent,'No disponible');
  assert.equal(rows[2].children[2].textContent,'Sin registros de alquiler relacionados.');
