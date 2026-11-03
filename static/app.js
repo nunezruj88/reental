@@ -7,7 +7,7 @@ document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>show(b.dataset
 document.querySelector('.brand').onclick=()=>show('dashboard');
 async function api(url,options){const r=await fetch(url,options);let value;try{value=await r.json();}catch{throw Error('No se pudo procesar la respuesta del servidor.');}if(!r.ok)throw Error(value.error||'Error al cargar los datos.');return value;}
 function bar(target,label,value,total){const row=el('div',undefined,'bar-row'),line=el('div',undefined,'bar-label');line.append(el('span',label),el('strong',fmt(value)));const p=el('progress');p.max=Math.max(1,total);p.value=value;p.setAttribute('aria-label',`${label}: ${value}`);row.append(line,p);target.append(row);}
-function render(){ renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('kpis').replaceChildren();for(const [label,n,note] of [['Registros de compras',s.purchases,`${fmt(s.unique)} claves únicas`],['Registros de alquiler',s.rentals,'Filas originales del archivo'],['Alquileres relacionados',s.matched,`${s.rentals?Math.round(s.matched/s.rentals*100):0}% del total`],['Claves sin alquiler',s.withoutRentals,'Identificadores de compras']]){const card=el('div',undefined,'kpi');card.append(el('span',label),el('strong',fmt(n)),el('small',note));$('kpis').append(card);}$('matchChart').replaceChildren();bar($('matchChart'),'Con compra relacionada',s.matched,s.rentals);bar($('matchChart'),'Sin compra relacionada / clave vacía',s.unmatched,s.rentals);$('topChart').replaceChildren();s.top.forEach(r=>bar($('topChart'),r.key,r.count,s.top[0].count));if(!s.top.length)$('topChart').append(el('p','Sin registros con identificador.'));$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
+function render(){ renderOrphans(); renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('kpis').replaceChildren();for(const [label,n,note] of [['Registros de compras',s.purchases,`${fmt(s.unique)} claves únicas`],['Registros de alquiler',s.rentals,'Filas originales del archivo'],['Alquileres relacionados',s.matched,`${s.rentals?Math.round(s.matched/s.rentals*100):0}% del total`],['Claves sin alquiler',s.withoutRentals,'Identificadores de compras']]){const card=el('div',undefined,'kpi');card.append(el('span',label),el('strong',fmt(n)),el('small',note));$('kpis').append(card);}$('matchChart').replaceChildren();bar($('matchChart'),'Con compra relacionada',s.matched,s.rentals);bar($('matchChart'),'Sin compra relacionada / clave vacía',s.unmatched,s.rentals);$('topChart').replaceChildren();s.top.forEach(r=>bar($('topChart'),r.key,r.count,s.top[0].count));if(!s.top.length)$('topChart').append(el('p','Sin registros con identificador.'));$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
 function getKey(row,source){return(source==='alquiler'?row[0].split('#')[0]:row[0]).trim();}
 function table(headers,rows,source,actions=true){const t=el('table'),head=el('thead'),tr=el('tr');headers.forEach(h=>tr.append(el('th',h)));if(actions)tr.append(el('th','Relación'));head.append(tr);const body=el('tbody');rows.forEach(row=>{const r=el('tr');row.forEach((v,i)=>{const display=displayValue(headers[i],v);const c=el('td',display);c.title=display;r.append(c);});if(actions){const c=el('td'),b=el('button','Ver relación');b.onclick=()=>{show('detail');related(getKey(row,source));};c.append(b);r.append(c);}body.append(r);});t.append(head,body);return t;}
 function renderTable(){const source=$('source').value;$('table').replaceChildren();if(!data){$('schema').textContent='Carga un CSV de inversiones o rendimientos para explorar los registros.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const d=data[source];if(!d.headers.length){$('schema').textContent='Todavía no has cargado este archivo.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const q=$('search').value.toLocaleLowerCase(),rows=d.rows.filter(r=>r.some(v=>v.toLocaleLowerCase().includes(q)));const pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages-1);$('schema').textContent=`${d.headers.length} columnas · ${fmt(rows.length)} registros · ${d.encoding}`;$('table').append(table(d.headers,rows.slice(page*50,page*50+50),source));$('pageLabel').textContent=`Página ${page+1} de ${pages}`;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;}
@@ -101,4 +101,50 @@ function displayValue(header,value){
  const name=header.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  if(!numericColumns.has(name)||! /^[+-]?\d+(?:[.,]\d+)?$/.test(value.trim()))return value;
  return new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value.trim().replace(',','.')));
+}
+
+function orphanRecords(dataset,source){
+ const other=source==='alquiler'?'compras':'alquiler';
+ const keys=new Set(dataset[other].rows.map(row=>getKey(row,other)).filter(Boolean));
+ return dataset[source].rows.flatMap((row,index)=>{
+  const key=getKey(row,source);
+  return key && keys.has(key)?[]:[{
+   record:index+1,key,row,
+   reason:!key?'Identificador vacío':!dataset[other].headers.length?'Archivo relacionado pendiente de cargar':source==='alquiler'?'Sin inversión coincidente':'Sin rendimiento coincidente'
+  }];
+ });
+}
+function renderOrphans(){
+ const box=$('orphanRecords');box.replaceChildren();box.hidden=!data;
+ if(!data)return;
+ box.append(el('h2','Registros sin relación'),el('p','Revisa los alquileres sin inversión y las inversiones sin rendimientos. Se comparan las claves de la primera columna, conservando ceros iniciales y mayúsculas. Una inversión sin rendimientos puede ser normal si todavía no ha generado pagos.'));
+ let count=0;
+ for(const [source,title] of [['alquiler','Alquileres sin inversión'],['compras','Inversiones sin rendimientos']]){
+  const records=orphanRecords(data,source);count+=records.length;
+  if(!records.length)continue;
+  const group=el('article');group.append(el('h3',title+' · '+fmt(records.length)));
+  if(!data[source==='alquiler'?'compras':'alquiler'].headers.length)group.append(el('p','Todavía no se ha cargado el otro archivo. Las relaciones se comprobarán de nuevo al importarlo.'));
+  const wrap=el('div',undefined,'table-wrap');wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label',title);
+  const controls=el('div',undefined,'pagination'),prev=el('button','← Anterior'),label=el('span'),next=el('button','Siguiente →');
+  prev.type=next.type='button';prev.setAttribute('aria-label','Página anterior: '+title);next.setAttribute('aria-label','Página siguiente: '+title);
+  label.setAttribute('aria-live','polite');
+  let currentPage=0;
+  const pages=Math.ceil(records.length/50);
+  function draw(){
+   const t=el('table'),head=el('thead'),tr=el('tr'),body=el('tbody');
+   ['Registro (sin cabecera)','Clave usada','Motivo',...data[source].headers].forEach(h=>tr.append(el('th',h)));head.append(tr);
+   for(const item of records.slice(currentPage*50,currentPage*50+50)){
+    const row=el('tr');
+    [String(item.record),item.key,item.reason,...item.row].forEach(value=>{const cell=el('td',value);cell.title=value;row.append(cell);});
+    body.append(row);
+   }
+   t.append(head,body);wrap.replaceChildren(t);wrap.scrollTop=0;
+   label.textContent='Página '+(currentPage+1)+' de '+pages;
+   prev.disabled=currentPage===0;next.disabled=currentPage===pages-1;
+  }
+  prev.onclick=()=>{if(currentPage>0){currentPage--;draw();}};
+  next.onclick=()=>{if(currentPage<pages-1){currentPage++;draw();}};
+  controls.append(prev,label,next);draw();group.append(wrap,controls);box.append(group);
+ }
+ if(!count)box.append(el('p','No hay registros sin relación en los archivos cargados.'));
 }
