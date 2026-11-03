@@ -1,4 +1,5 @@
 """Observed amounts in USD; investment periods in months."""
+from calendar import monthrange
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -99,3 +100,55 @@ def portfolio_totals(data):
         values = [number(row[index]) for row in dataset['rows']]
         result[field] = str(sum(values, Decimal(0))) if all(v is not None for v in values) else None
     return result
+
+
+def purchase_maturities(purchases):
+    """Calculate each purchase end date independently of rental imports."""
+    projects, warnings = [], []
+    for index, values in enumerate(purchases['rows'], 1):
+        row = dict(zip(purchases['headers'], values))
+        key = values[0].strip()
+        issues = []
+
+        def required(field):
+            if field not in row:
+                issues.append(f'Falta la columna "{field}".')
+            elif not row[field].strip():
+                issues.append(f'Falta el valor de "{field}".')
+            return row.get(field, '').strip()
+
+        kind = required('rendimiento')
+        period_text = required('periodo')
+        months = number(period_text) if period_text else None
+        if period_text and (months is None or months <= 0 or months != months.to_integral_value() or months > 120000):
+            issues.append('"periodo" debe ser un número entero positivo de meses dentro del rango de fechas.')
+            months = None
+        start_field = 'inicio proyecto' if kind.casefold() == 'bullet' else 'inicio rendimiento'
+        start_text = required(start_field) if kind else ''
+        start = None
+        if start_text:
+            for pattern in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
+                try:
+                    start = datetime.strptime(start_text, pattern).date()
+                    break
+                except ValueError:
+                    pass
+            if start is None:
+                issues.append(f'"{start_field}" no es una fecha válida (DD/MM/AA, DD/MM/AAAA o AAAA-MM-DD).')
+        end = None
+        if start and months is not None:
+            try:
+                offset = start.year * 12 + start.month - 1 + int(months)
+                year, month = divmod(offset, 12)
+                month += 1
+                end = start.replace(year=year, month=month, day=min(start.day, monthrange(year, month)[1]))
+            except (ValueError, OverflowError):
+                issues.append('La fecha de finalización queda fuera del rango admitido.')
+        if issues:
+            warnings.append({'record': index, 'key': key, 'reason': ' '.join(issues)})
+        elif end:
+            projects.append({'record': index, 'key': key, 'date': end.isoformat(),
+                             'start': start.isoformat(), 'startField': start_field,
+                             'period': int(months), 'kind': kind})
+    projects.sort(key=lambda item: (item['date'], item['record']))
+    return {'projects': projects, 'warnings': warnings}
