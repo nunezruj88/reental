@@ -90,7 +90,7 @@ def analyze(data):
 def portfolio_totals(data):
     """Independent totals for the overview, without requiring the full financial schema."""
     result = {}
-    for source, field in [('compras', 'inversion'), ('alquiler', 'reinvested'), ('alquiler', 'claimed')]:
+    for source, field in [('compras', 'capital'), ('alquiler', 'reinvested'), ('alquiler', 'claimed')]:
         dataset = data[source]
         if field not in dataset['headers']:
             result[field] = None

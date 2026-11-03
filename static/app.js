@@ -97,7 +97,7 @@ function renderCountries(){
 }
 
 function displayValue(header,value){
- const numericColumns=new Set(['inversion','distributed','retained','reinvested','claimed','retorno recurrente anualizado','retorno final anualizado','retorno total anualizado','retorno total','retorno total (origen)']);
+ const numericColumns=new Set(['capital','inversion','distributed','retained','reinvested','claimed','retorno recurrente anualizado','retorno final anualizado','retorno total anualizado','retorno total','retorno total (origen)']);
  const name=header.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  if(!numericColumns.has(name)||! /^[+-]?\d+(?:[.,]\d+)?$/.test(value.trim()))return value;
  return new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value.trim().replace(',','.')));
@@ -155,7 +155,7 @@ function renderPortfolio(){
  if(!data)return;
  const totals=data.portfolioTotals||{};
  for(const [title,field,note] of [
-  ['Valor invertido en inmuebles','inversion','Inversión registrada en compras'],
+  ['Valor invertido en inmuebles','capital','Suma del capital del archivo de inversiones'],
   ['Rendimientos reinvertidos','reinvested','Reinvertido en los registros de alquiler'],
   ['Rendimientos reclamados','claimed','Reclamado en los registros de alquiler']
  ]){
