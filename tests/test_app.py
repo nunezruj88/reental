@@ -103,6 +103,20 @@ class Tests(unittest.TestCase):
             self.assertEqual(self.request('/api/import', payload)[0], '400 Bad Request')
             self.assertEqual(app.current(), before)
 
+    def test_maturities_on_import_reload_and_replacement(self):
+        payload = self.payload('id;rendimiento;inicio proyecto;inicio rendimiento;periodo\nA;bullet;31/01/26;;1\nB;mensual;;;12\n',
+                               'id,valor\nA#1,2\n')
+        status, result = self.request('/api/import', {'compras': payload['compras']})
+        self.assertEqual(status, '200 OK')
+        self.assertEqual(result['maturities']['projects'][0]['date'], '2026-02-28')
+        self.assertIn('inicio rendimiento', result['maturities']['warnings'][0]['reason'])
+        self.assertEqual(self.request('/api/data')[1]['maturities'], result['maturities'])
+        status, rentals = self.request('/api/import', {'alquiler': payload['alquiler']})
+        self.assertEqual(rentals['maturities'], result['maturities'])
+        fixed = self.payload('id;rendimiento;inicio proyecto;periodo\nA;bullet;01/01/26;12\n', '')
+        _, result = self.request('/api/import', {'compras': fixed['compras']})
+        self.assertEqual(result['maturities']['warnings'], [])
+
     def test_no_static_traversal(self):
         self.assertEqual(self.request('/../app.py')[0], '404 Not Found')
 

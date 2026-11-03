@@ -7,7 +7,7 @@ document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>show(b.dataset
 document.querySelector('.brand').onclick=()=>show('dashboard');
 async function api(url,options){const r=await fetch(url,options);let value;try{value=await r.json();}catch{throw Error('No se pudo procesar la respuesta del servidor.');}if(!r.ok)throw Error(value.error||'Error al cargar los datos.');return value;}
 function bar(target,label,value,total){const row=el('div',undefined,'bar-row'),line=el('div',undefined,'bar-label');line.append(el('span',label),el('strong',fmt(value)));const p=el('progress');p.max=Math.max(1,total);p.value=value;p.setAttribute('aria-label',`${label}: ${value}`);row.append(line,p);target.append(row);}
-function render(){ renderPortfolio(); renderOrphans(); renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('kpis').replaceChildren();for(const [label,n,note] of [['Registros de compras',s.purchases,`${fmt(s.unique)} claves únicas`],['Registros de alquiler',s.rentals,'Filas originales del archivo'],['Alquileres relacionados',s.matched,`${s.rentals?Math.round(s.matched/s.rentals*100):0}% del total`],['Claves sin alquiler',s.withoutRentals,'Identificadores de compras']]){const card=el('div',undefined,'kpi');card.append(el('span',label),el('strong',fmt(n)),el('small',note));$('kpis').append(card);}$('matchChart').replaceChildren();bar($('matchChart'),'Con compra relacionada',s.matched,s.rentals);bar($('matchChart'),'Sin compra relacionada / clave vacía',s.unmatched,s.rentals);$('topChart').replaceChildren();s.top.forEach(r=>bar($('topChart'),r.key,r.count,s.top[0].count));if(!s.top.length)$('topChart').append(el('p','Sin registros con identificador.'));$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
+function render(){ renderMaturities(); renderPortfolio(); renderOrphans(); renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('kpis').replaceChildren();for(const [label,n,note] of [['Registros de compras',s.purchases,`${fmt(s.unique)} claves únicas`],['Registros de alquiler',s.rentals,'Filas originales del archivo'],['Alquileres relacionados',s.matched,`${s.rentals?Math.round(s.matched/s.rentals*100):0}% del total`],['Claves sin alquiler',s.withoutRentals,'Identificadores de compras']]){const card=el('div',undefined,'kpi');card.append(el('span',label),el('strong',fmt(n)),el('small',note));$('kpis').append(card);}$('topChart').replaceChildren();s.top.forEach(r=>bar($('topChart'),r.key,r.count,s.top[0].count));if(!s.top.length)$('topChart').append(el('p','Sin registros con identificador.'));$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
 function getKey(row,source){return(source==='alquiler'?row[0].split('#')[0]:row[0]).trim();}
 function table(headers,rows,source,actions=true){const t=el('table'),head=el('thead'),tr=el('tr');headers.forEach(h=>tr.append(el('th',h)));if(actions)tr.append(el('th','Relación'));head.append(tr);const body=el('tbody');rows.forEach(row=>{const r=el('tr');row.forEach((v,i)=>{const display=displayValue(headers[i],v);const c=el('td',display);c.title=display;r.append(c);});if(actions){const c=el('td'),b=el('button','Ver relación');b.onclick=()=>{show('detail');related(getKey(row,source));};c.append(b);r.append(c);}body.append(r);});t.append(head,body);return t;}
 function renderTable(){const source=$('source').value;$('table').replaceChildren();if(!data){$('schema').textContent='Carga un CSV de inversiones o rendimientos para explorar los registros.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const d=data[source];if(!d.headers.length){$('schema').textContent='Todavía no has cargado este archivo.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const q=$('search').value.toLocaleLowerCase(),rows=d.rows.filter(r=>r.some(v=>v.toLocaleLowerCase().includes(q)));const pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages-1);$('schema').textContent=`${d.headers.length} columnas · ${fmt(rows.length)} registros · ${d.encoding}`;$('table').append(table(d.headers,rows.slice(page*50,page*50+50),source));$('pageLabel').textContent=`Página ${page+1} de ${pages}`;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;}
@@ -34,6 +34,7 @@ for(const [source,label] of [['compras','inversiones'],['alquiler','rendimientos
    $('relations').replaceChildren(el('h2','Registros relacionados'),el('p','Selecciona «Ver relación» en una fila.'));
    form.reset();
    status.textContent='Archivo de '+label+' importado correctamente. Se conservan los datos del otro archivo.';
+   if(source==='compras'&&data.maturities?.warnings.length)status.textContent+=' Hay '+fmt(data.maturities.warnings.length)+' compras sin fecha de finalización calculable. Revisa los avisos de abajo.';
   }catch(err){status.textContent=err.message;}
   finally{importing=false;$('comprasSubmit').disabled=$('alquilerSubmit').disabled=false;button.textContent=original;}
  };
@@ -162,5 +163,52 @@ function renderPortfolio(){
   const card=el('article',undefined,'kpi');
   card.append(el('h3',title),el('strong',amount(totals[field])),el('small',note));
   cards.append(card);
+ }
+}
+
+function pagedMaturities(target,items,draw){
+ let page=0;
+ const content=el('div'),controls=el('div',undefined,'pagination');
+ const prev=el('button','← Anterior'),label=el('span'),next=el('button','Siguiente →');
+ prev.type=next.type='button';label.setAttribute('aria-live','polite');
+ function update(){
+  content.replaceChildren(draw(items.slice(page*50,page*50+50)));
+  label.textContent='Página '+(page+1)+' de '+Math.ceil(items.length/50);
+  prev.disabled=page===0;next.disabled=(page+1)*50>=items.length;
+ }
+ prev.onclick=()=>{if(page>0){page--;update();}};
+ next.onclick=()=>{if((page+1)*50<items.length){page++;update();}};
+ controls.append(prev,label,next);target.append(content);
+ if(items.length>50)target.append(controls);
+ update();
+}
+function renderMaturities(){
+ const chart=$('maturityChart'),warnings=$('maturityWarnings');
+ chart.replaceChildren();warnings.replaceChildren();warnings.hidden=true;
+ if(!data)return;
+ const m=data.maturities||{projects:[],warnings:[]};
+ if(m.projects.length){
+  chart.append(el('p',fmt(m.projects.length)+' compras con fecha calculada'));
+  pagedMaturities(chart,m.projects,items=>{
+   const list=el('ol',undefined,'maturity-timeline');
+   for(const item of items){
+    const row=el('li'),time=el('time',item.date.split('-').reverse().join('/'));
+    time.dateTime=item.date;
+    row.append(time,el('strong',item.key||'Compra sin identificador'),el('small','Registro '+item.record+' · '+item.kind+' · '+item.period+' meses · desde '+item.start.split('-').reverse().join('/')));
+    list.append(row);
+   }
+   return list;
+  });
+ }else chart.append(el('p',data.compras.rows.length?'No hay compras con datos suficientes para calcular su finalización.':'Carga el archivo de compras para ver las fechas de finalización.'));
+ if(m.warnings.length){
+  const link=el('button','Revisar '+fmt(m.warnings.length)+' compras sin fecha');
+  link.type='button';link.onclick=()=>{show('upload');warnings.scrollIntoView({behavior:'smooth',block:'start'});};chart.append(link);
+  warnings.hidden=false;
+  warnings.append(el('h2','Compras sin fecha de finalización · '+fmt(m.warnings.length)),el('p','La carga se ha guardado. Estas compras no aparecen en el calendario hasta completar o corregir los datos y volver a importar el archivo.'));
+  pagedMaturities(warnings,m.warnings,items=>{
+   const wrap=el('div',undefined,'table-wrap');
+   wrap.append(table(['Registro (sin cabecera)','Compra','Dato pendiente o inválido'],items.map(x=>[String(x.record),x.key,x.reason]),'compras',false));
+   return wrap;
+  });
  }
 }
