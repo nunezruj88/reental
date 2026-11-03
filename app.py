@@ -9,7 +9,7 @@ from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from finance import analyze
+from finance import analyze, portfolio_totals
 
 ROOT = Path(__file__).parent
 DB = Path(os.environ.get('REENTAL_DB', str(ROOT / 'data' / 'reental.sqlite3')))
@@ -89,6 +89,7 @@ def current():
     data = json.loads(row[0]) if row else None
     if data:
         data['financial'] = analyze(data)
+        data['portfolioTotals'] = portfolio_totals(data)
     return data
 
 
@@ -123,6 +124,7 @@ def application(env, start_response):
                 data['updated'] = datetime.now(timezone.utc).isoformat()
                 data['summary'] = summarize(data)
                 data['financial'] = analyze(data)
+                data['portfolioTotals'] = portfolio_totals(data)
                 con.execute('INSERT OR REPLACE INTO dataset VALUES (1, ?)', (json.dumps(data, ensure_ascii=False),))
             result = data
         elif path == '/api/data' and method == 'GET':

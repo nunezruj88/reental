@@ -85,3 +85,17 @@ def analyze(data):
             'unmatchedDistributed': total(orphan, 'distributed'),
             'componentsReconcile': len(residual) == len(rent) and all(v == 0 for v in residual),
             'warnings': list(dict.fromkeys(warnings))}
+
+
+def portfolio_totals(data):
+    """Independent totals for the overview, without requiring the full financial schema."""
+    result = {}
+    for source, field in [('compras', 'inversion'), ('alquiler', 'reinvested'), ('alquiler', 'claimed')]:
+        dataset = data[source]
+        if field not in dataset['headers']:
+            result[field] = None
+            continue
+        index = dataset['headers'].index(field)
+        values = [number(row[index]) for row in dataset['rows']]
+        result[field] = str(sum(values, Decimal(0))) if all(v is not None for v in values) else None
+    return result
