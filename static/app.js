@@ -218,18 +218,19 @@ function renderPurchaseReturns(){
  if(!data)return;
  const items=data.purchaseReturns||[];
  if(!items.length){chart.append(el('p','Carga el archivo de compras para ver sus rendimientos.'));return;}
- const max=Math.max(1,...items.map(item=>Math.abs(Number(item.percentage))));
- const percent=value=>value===null?'No disponible':new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))+' %';
- chart.append(el('p',fmt(items.length)+' compras · Los porcentajes no disponibles aparecen al final.'));
+ const max=Math.max(1,...items.map(item=>Math.abs(Number(item.annualizedPercentage))).filter(Number.isFinite));
+ const percent=value=>value===null||value===undefined?'No disponible':new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))+' %';
+ chart.append(el('p',fmt(items.length)+' compras · Los porcentajes anualizados no disponibles aparecen al final.'));
  pagedMaturities(chart,items,rows=>{
   const list=el('ol',undefined,'purchase-returns');
   for(const item of rows){
    const row=el('li'),heading=el('div',undefined,'bar-label');
-   heading.append(el('strong',item.key||'Compra sin identificador'),el('strong',percent(item.percentage)));
-   row.append(heading,el('p','Importe de compra: '+amount(item.capital)+' · Rendimiento obtenido: '+amount(item.amount)+' · Registro '+item.record));
-   if(item.percentage!==null){
-    const value=Number(item.percentage),track=el('div',undefined,'return-track'),fill=el('div',undefined,value<0?'return-fill negative':'return-fill');
-    track.setAttribute('role','img');track.setAttribute('aria-label','Rendimiento: '+percent(item.percentage)+' · '+amount(item.amount));
+   heading.append(el('strong',item.key||'Compra sin identificador'),el('strong',percent(item.annualizedPercentage)+' anualizado'));
+   row.append(heading,el('p','Total obtenido acumulado: '+amount(item.amount)),el('p','Importe de compra: '+amount(item.capital)+' · Registro '+item.record));
+   if(item.days>0)row.append(el('p','Desde '+item.start.split('-').reverse().join('/')+' hasta '+item.asOf.split('-').reverse().join('/')+' · '+item.days+' días','muted'));
+   if(item.annualizedPercentage!==null&&item.annualizedPercentage!==undefined){
+    const value=Number(item.annualizedPercentage),track=el('div',undefined,'return-track'),fill=el('div',undefined,value<0?'return-fill negative':'return-fill');
+    track.setAttribute('role','img');track.setAttribute('aria-label','Rendimiento anualizado: '+percent(item.annualizedPercentage)+' · '+amount(item.amount));
     fill.style.width=(Math.abs(value)/max*50)+'%';
     fill.style.left=(value<0?50-Math.abs(value)/max*50:50)+'%';
     track.append(fill);row.append(track);

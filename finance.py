@@ -1,7 +1,8 @@
 """Observed amounts in USD; investment periods in months."""
 from calendar import monthrange
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal, InvalidOperation
 import re
 
@@ -154,8 +155,9 @@ def purchase_maturities(purchases):
     return {'projects': projects, 'warnings': warnings}
 
 
-def purchase_returns(data):
-    """Observed distributed amounts divided by capital, one result per purchase."""
+def purchase_returns(data, as_of=None):
+    """Accumulated return and simple annualization over elapsed calendar days."""
+    as_of = as_of or datetime.now(ZoneInfo("Europe/Madrid")).date()
     purchases, rentals = data['compras'], data['alquiler']
     counts = defaultdict(int)
     for row in purchases['rows']:
@@ -190,13 +192,43 @@ def purchase_returns(data):
             else:
                 reasons.append('Hay importes distributed vacíos o no numéricos.')
         percentage = amount / capital * Decimal(100) if amount is not None and capital is not None and capital > 0 else None
+
+        annualized = None
+        days = None
+        start = None
+        if percentage is not None:
+            purchase = dict(zip(purchases['headers'], row))
+            kind = purchase.get('rendimiento', '').strip()
+            if not kind:
+                reasons.append('Falta rendimiento para elegir la fecha de inicio de la anualización.')
+            else:
+                start_field = 'inicio proyecto' if kind.casefold() == 'bullet' else 'inicio rendimiento'
+                start_text = purchase.get(start_field, '').strip()
+                for pattern in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
+                    try:
+                        start = datetime.strptime(start_text, pattern).date()
+                        break
+                    except ValueError:
+                        pass
+                if start is None:
+                    reasons.append(f'Falta una fecha válida en "{start_field}" para anualizar.')
+                else:
+                    days = (as_of - start).days
+                    if days <= 0:
+                        reasons.append('La fecha de inicio debe ser anterior a la fecha de cálculo para anualizar.')
+                    else:
+                        annualized = percentage * Decimal(365) / Decimal(days)
         ranked.append({'record': record, 'key': key, 'capital': capital, 'amount': amount, 'percentage': percentage,
+                       'annualizedPercentage': annualized, 'days': days, 'asOf': as_of.isoformat(),
+                       'start': start.isoformat() if start else None,
                        'reason': ' '.join(reasons)})
-    ranked.sort(key=lambda item: (item['percentage'] is None,
-                                  -(item['percentage'] if item['percentage'] is not None else Decimal(0)),
+    ranked.sort(key=lambda item: (item['annualizedPercentage'] is None,
+                                  -(item['annualizedPercentage'] if item['annualizedPercentage'] is not None else Decimal(0)),
                                   item['record']))
     return [{'record': item['record'], 'key': item['key'],
              'capital': str(item['capital']) if item['capital'] is not None else None,
              'amount': str(item['amount']) if item['amount'] is not None else None,
              'percentage': str(item['percentage']) if item['percentage'] is not None else None,
+             'annualizedPercentage': str(item['annualizedPercentage']) if item['annualizedPercentage'] is not None else None,
+             'days': item['days'], 'start': item['start'], 'asOf': item['asOf'],
              'reason': item['reason']} for item in ranked]
