@@ -244,3 +244,23 @@ def purchase_returns(data, as_of=None):
              'annualizedPercentage': str(item['annualizedPercentage']) if item['annualizedPercentage'] is not None else None,
              'days': item['days'], 'start': item['start'], 'asOf': item['asOf'],
              'reason': item['reason']} for item in ranked]
+
+
+def investment_status(purchases, maturities, as_of=None):
+    """Count purchases by calculated end date, keeping unknown dates separate."""
+    as_of = as_of or datetime.now(ZoneInfo("Europe/Madrid")).date()
+    today = as_of.isoformat()
+    projects = maturities['projects']
+    expired = [item for item in projects if item['date'] < today]
+    upcoming = sorted((item for item in projects if item['date'] >= today),
+                      key=lambda item: (item['date'], item['record']))
+    next_purchase = None
+    if upcoming:
+        item = upcoming[0]
+        end = date.fromisoformat(item['date'])
+        start = date.fromisoformat(item['start'])
+        duration = (end - start).days
+        next_purchase = {**item, 'daysRemaining': (end - as_of).days,
+                         'progress': max(0, min(1, (as_of - start).days / duration)) if duration > 0 else 0}
+    return {'total': len(purchases['rows']), 'expired': len(expired), 'upcoming': len(upcoming),
+            'unknown': len(purchases['rows']) - len(projects), 'next': next_purchase, 'asOf': today}
