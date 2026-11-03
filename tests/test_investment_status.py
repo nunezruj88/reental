@@ -47,3 +47,19 @@ class InvestmentStatusTests(unittest.TestCase):
         self.assertEqual(result['total'], 2)
         self.assertEqual(result['upcoming'], 2)
         self.assertEqual(result['next']['record'], 1)
+
+
+    def test_next_uses_available_start_not_rendimiento_type(self):
+        purchases = {'headers': ['id', 'rendimiento', 'inicio proyecto', 'inicio rendimiento', 'periodo'],
+                     'rows': [['Después', 'bullet', '2026-09-01', '2026-11-01', '12'],
+                              ['Primera', 'mensual', '2026-01-01', '', '12'],
+                              ['Segunda', 'otro', '2026-02-01', '', '12']]}
+        result = investment_status(purchases, purchase_maturities(purchases), date(2026, 11, 3))
+        self.assertEqual(result['next']['key'], 'Primera')
+        self.assertEqual(result['next']['date'], '2027-01-01')
+        self.assertEqual(result['unknown'], 0)
+        for row in purchases['rows']:
+            row[1] = 'bullet'
+        changed = investment_status(purchases, purchase_maturities(purchases), date(2026, 11, 3))
+        self.assertEqual(changed['next']['key'], 'Primera')
+        self.assertEqual(changed['next']['date'], '2027-01-01')

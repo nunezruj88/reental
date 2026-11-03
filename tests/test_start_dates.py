@@ -47,7 +47,7 @@ class StartDateAliasTests(unittest.TestCase):
         d = data()
         d['compras']['rows'][0][2] = 'bullet'
         self.assertIsNone(purchase_returns(d, as_of=date(2026, 11, 3))[0]['annualizedPercentage'])
-        self.assertEqual(len(purchase_maturities(d['compras'])['warnings']), 1)
+        self.assertEqual(purchase_maturities(d['compras'])['projects'][0]['date'], '2026-11-03')
         d['compras']['headers'].append('inicio proyecto')
         d['compras']['rows'][0].append('03/11/25')
         self.assertEqual(purchase_returns(d, as_of=date(2026, 11, 3))[0]['annualizedPercentage'], '10.0')

@@ -109,7 +109,7 @@ class Tests(unittest.TestCase):
         status, result = self.request('/api/import', {'compras': payload['compras']})
         self.assertEqual(status, '200 OK')
         self.assertEqual(result['maturities']['projects'][0]['date'], '2026-02-28')
-        self.assertIn('inicio rendimiento', result['maturities']['warnings'][0]['reason'])
+        self.assertIn('inicio proyecto', result['maturities']['warnings'][0]['reason'])
         self.assertEqual(self.request('/api/data')[1]['maturities'], result['maturities'])
         status, rentals = self.request('/api/import', {'alquiler': payload['alquiler']})
         self.assertEqual(rentals['maturities'], result['maturities'])

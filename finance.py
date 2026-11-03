@@ -115,6 +115,14 @@ def purchase_start_field(row, kind):
     return 'inicio rendimiento' if 'inicio rendimiento' in row else 'inicio rendimientos' if 'inicio rendimientos' in row else 'inicio rendimiento'
 
 
+def maturity_start_field(row):
+    """Use a populated yield start date, otherwise the project start date."""
+    for field in ('inicio rendimiento', 'inicio rendimientos'):
+        if row.get(field, '').strip():
+            return field
+    return 'inicio proyecto'
+
+
 def purchase_maturities(purchases):
     """Calculate each purchase end date independently of rental imports."""
     projects, warnings = [], []
@@ -130,14 +138,14 @@ def purchase_maturities(purchases):
                 issues.append(f'Falta el valor de "{field}".')
             return row.get(field, '').strip()
 
-        kind = required('rendimiento')
+        kind = row.get('rendimiento', '').strip()
         period_text = required('periodo')
         months = number(period_text) if period_text else None
         if period_text and (months is None or months <= 0 or months != months.to_integral_value() or months > 120000):
             issues.append('"periodo" debe ser un número entero positivo de meses dentro del rango de fechas.')
             months = None
-        start_field = purchase_start_field(row, kind)
-        start_text = required(start_field) if kind else ''
+        start_field = maturity_start_field(row)
+        start_text = required(start_field)
         start = None
         if start_text:
             for pattern in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):

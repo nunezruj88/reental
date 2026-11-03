@@ -7,14 +7,14 @@ def calc(rows, headers=HEADERS):
     return purchase_maturities({'headers': headers, 'rows': rows})
 
 class MaturityTests(unittest.TestCase):
-    def test_bullet_uses_project_start_and_others_use_yield_start(self):
+    def test_yield_start_takes_precedence_for_every_type(self):
         result = calc([
             ['A', ' Bullet ', '31/01/2026', '01/01/2030', '1'],
             ['B', 'mensual', '01/01/2030', '15/12/26', '2'],
         ])
         self.assertEqual(result['warnings'], [])
-        self.assertEqual([x['date'] for x in result['projects']], ['2026-02-28', '2027-02-15'])
-        self.assertEqual(result['projects'][0]['startField'], 'inicio proyecto')
+        self.assertEqual([x['date'] for x in result['projects']], ['2027-02-15', '2030-02-01'])
+        self.assertEqual(result['projects'][0]['startField'], 'inicio rendimiento')
         self.assertEqual(result['projects'][1]['startField'], 'inicio rendimiento')
 
     def test_leap_year_and_year_boundary(self):
@@ -30,9 +30,9 @@ class MaturityTests(unittest.TestCase):
         self.assertEqual(len(result['warnings']), 2)
         self.assertIn('inicio proyecto', result['warnings'][0]['reason'])
         self.assertIn('periodo', result['warnings'][0]['reason'])
-        self.assertIn('rendimiento', result['warnings'][1]['reason'])
+        self.assertIn('inicio proyecto', result['warnings'][1]['reason'])
         result = calc([['001', 'mensual', '12']], ['id', 'rendimiento', 'periodo'])
-        self.assertIn('Falta la columna "inicio rendimiento"', result['warnings'][0]['reason'])
+        self.assertIn('Falta la columna "inicio proyecto"', result['warnings'][0]['reason'])
         self.assertEqual(result['warnings'][0]['key'], '001')
 
     def test_invalid_dates_and_periods_do_not_break_import(self):
@@ -47,7 +47,7 @@ class MaturityTests(unittest.TestCase):
     def test_only_the_selected_start_field_is_required(self):
         self.assertEqual(calc([['A', 'bullet', '2026-01-01', '', '12']])['warnings'], [])
         self.assertEqual(calc([['A', 'mensual', '', '2026-01-01', '12']])['warnings'], [])
-        self.assertEqual(calc([['A', 'mensual', '2026-01-01', '', '12']])['projects'], [])
+        self.assertEqual(calc([['A', 'mensual', '2026-01-01', '', '12']])['projects'][0]['date'], '2027-01-01')
 
     def test_sorted_dates_duplicates_and_record_identity(self):
         result = calc([['A', 'bullet', '2027-01-01', '', '12'],
@@ -56,3 +56,19 @@ class MaturityTests(unittest.TestCase):
         self.assertEqual([x['record'] for x in result['projects']], [2, 3, 1])
         self.assertEqual(len(result['projects']), 3)
         self.assertEqual(calc([], [])['warnings'], [])
+
+
+    def test_rendimiento_is_optional_and_does_not_change_dates(self):
+        result = calc([['A', '2026-02-01', '2026-01-01', '12'],
+                       ['B', '2026-02-01', '', '12']],
+                      ['id', 'inicio proyecto', 'inicio rendimientos', 'periodo'])
+        self.assertEqual(result['warnings'], [])
+        self.assertEqual([x['date'] for x in result['projects']], ['2027-01-01', '2027-02-01'])
+        for kind in ['bullet', 'mensual', '', 'otro']:
+            r = calc([['A', kind, '2026-02-01', '2026-01-01', '12']])
+            self.assertEqual(r['projects'][0]['date'], '2027-01-01')
+
+    def test_invalid_populated_yield_date_warns_instead_of_using_project_start(self):
+        result = calc([['A', 'bullet', '2026-01-01', 'bad', '12']])
+        self.assertEqual(result['projects'], [])
+        self.assertIn('inicio rendimiento', result['warnings'][0]['reason'])
