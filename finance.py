@@ -190,12 +190,13 @@ def purchase_returns(data):
             else:
                 reasons.append('Hay importes distributed vacíos o no numéricos.')
         percentage = amount / capital * Decimal(100) if amount is not None and capital is not None and capital > 0 else None
-        ranked.append({'record': record, 'key': key, 'amount': amount, 'percentage': percentage,
+        ranked.append({'record': record, 'key': key, 'capital': capital, 'amount': amount, 'percentage': percentage,
                        'reason': ' '.join(reasons)})
     ranked.sort(key=lambda item: (item['percentage'] is None,
                                   -(item['percentage'] if item['percentage'] is not None else Decimal(0)),
                                   item['record']))
     return [{'record': item['record'], 'key': item['key'],
+             'capital': str(item['capital']) if item['capital'] is not None else None,
              'amount': str(item['amount']) if item['amount'] is not None else None,
              'percentage': str(item['percentage']) if item['percentage'] is not None else None,
              'reason': item['reason']} for item in ranked]
