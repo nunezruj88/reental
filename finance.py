@@ -103,6 +103,18 @@ def portfolio_totals(data):
     return result
 
 
+
+def purchase_start_field(row, kind):
+    """Accept both names used by investment exports for the yield start date."""
+    if kind.strip().casefold() == 'bullet':
+        return 'inicio proyecto'
+    for field in ('inicio rendimiento', 'inicio rendimientos'):
+        if row.get(field, '').strip():
+            return field
+    # Keep an existing header so diagnostics name the column actually supplied.
+    return 'inicio rendimiento' if 'inicio rendimiento' in row else 'inicio rendimientos' if 'inicio rendimientos' in row else 'inicio rendimiento'
+
+
 def purchase_maturities(purchases):
     """Calculate each purchase end date independently of rental imports."""
     projects, warnings = [], []
@@ -124,7 +136,7 @@ def purchase_maturities(purchases):
         if period_text and (months is None or months <= 0 or months != months.to_integral_value() or months > 120000):
             issues.append('"periodo" debe ser un número entero positivo de meses dentro del rango de fechas.')
             months = None
-        start_field = 'inicio proyecto' if kind.casefold() == 'bullet' else 'inicio rendimiento'
+        start_field = purchase_start_field(row, kind)
         start_text = required(start_field) if kind else ''
         start = None
         if start_text:
@@ -202,7 +214,7 @@ def purchase_returns(data, as_of=None):
             if not kind:
                 reasons.append('Falta rendimiento para elegir la fecha de inicio de la anualización.')
             else:
-                start_field = 'inicio proyecto' if kind.casefold() == 'bullet' else 'inicio rendimiento'
+                start_field = purchase_start_field(purchase, kind)
                 start_text = purchase.get(start_field, '').strip()
                 for pattern in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
                     try:
