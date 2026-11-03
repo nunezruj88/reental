@@ -117,6 +117,18 @@ class Tests(unittest.TestCase):
         _, result = self.request('/api/import', {'compras': fixed['compras']})
         self.assertEqual(result['maturities']['warnings'], [])
 
+    def test_returns_recalculated_on_import_and_reload(self):
+        payload = self.payload('id,capital\nA,100\nB,200\n', 'id,distributed\nA#1,10\nB#1,40\n')
+        self.request('/api/import', {'compras': payload['compras']})
+        status, result = self.request('/api/import', {'alquiler': payload['alquiler']})
+        self.assertEqual(status, '200 OK')
+        self.assertEqual([r['key'] for r in result['purchaseReturns']], ['B', 'A'])
+        self.assertEqual(self.request('/api/data')[1]['purchaseReturns'], result['purchaseReturns'])
+        replacement = self.payload('id,capital\nA,25\nB,200\n', '')
+        _, result = self.request('/api/import', {'compras': replacement['compras']})
+        self.assertEqual(result['purchaseReturns'][0]['key'], 'A')
+        self.assertEqual(result['purchaseReturns'][0]['percentage'], '40.0')
+
     def test_no_static_traversal(self):
         self.assertEqual(self.request('/../app.py')[0], '404 Not Found')
 
