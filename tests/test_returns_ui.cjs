@@ -29,23 +29,23 @@ function setup(){
 test('ranked chart shows percentage and USD including negative and unavailable values',()=>{
  const s=setup(),chart=s.context.document.getElementById('purchaseReturnsChart');
  s.context.fixture={purchaseReturns:[
-  {key:'A',record:1,capital:'200',amount:'20',percentage:'10',reason:''},
-  {key:'B',record:2,capital:'200',amount:'-5',percentage:'-2.5',reason:''},
-  {key:'C',record:3,capital:null,amount:null,percentage:null,reason:'Sin registros de alquiler relacionados.'}
+  {key:'A',record:1,capital:'200',amount:'20',annualizedPercentage:'10',reason:''},
+  {key:'B',record:2,capital:'200',amount:'-5',annualizedPercentage:'-2.5',reason:''},
+  {key:'C',record:3,capital:null,amount:null,annualizedPercentage:null,reason:'Sin registros de alquiler relacionados.'}
  ]};
  vm.runInContext('data=fixture;renderPurchaseReturns()',s.context);
  const rows=chart.children[1].children[0].children;
- assert.equal(rows[0].children[0].children[1].textContent,'10,00 %');
- assert.match(rows[0].children[1].textContent,/Importe de compra: 200,00/);
- assert.match(rows[0].children[1].textContent,/Rendimiento obtenido: 20,00/);
- assert.match(rows[2].children[1].textContent,/Importe de compra: No disponible/);
- assert.equal(rows[1].children[2].children[0].className,'return-fill negative');
- assert.equal(rows[2].children[0].children[1].textContent,'No disponible');
- assert.equal(rows[2].children[2].textContent,'Sin registros de alquiler relacionados.');
+ assert.equal(rows[0].children[0].children[1].textContent,'10,00 % anualizado');
+ assert.match(rows[0].children[2].textContent,/Importe de compra: 200,00/);
+ assert.match(rows[0].children[1].textContent,/Total obtenido acumulado: 20,00/);
+ assert.match(rows[2].children[2].textContent,/Importe de compra: No disponible/);
+ assert.equal(rows[1].children[3].children[0].className,'return-fill negative');
+ assert.equal(rows[2].children[0].children[1].textContent,'No disponible anualizado');
+ assert.equal(rows[2].children[3].textContent,'Sin registros de alquiler relacionados.');
 });
 test('all purchases remain reachable through pages and chart resets on replacement',()=>{
  const s=setup(),chart=s.context.document.getElementById('purchaseReturnsChart');
- s.context.fixture={purchaseReturns:Array.from({length:51},(_,i)=>({key:'A'+i,record:i+1,amount:'1',percentage:'1',reason:''}))};
+ s.context.fixture={purchaseReturns:Array.from({length:51},(_,i)=>({key:'A'+i,record:i+1,amount:'1',annualizedPercentage:'1',reason:''}))};
  vm.runInContext('data=fixture;renderPurchaseReturns()',s.context);
  const content=chart.children[1],controls=chart.children[2];
  assert.equal(content.children[0].children.length,50);controls.children[2].onclick();
