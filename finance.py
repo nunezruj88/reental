@@ -152,3 +152,50 @@ def purchase_maturities(purchases):
                              'period': int(months), 'kind': kind})
     projects.sort(key=lambda item: (item['date'], item['record']))
     return {'projects': projects, 'warnings': warnings}
+
+
+def purchase_returns(data):
+    """Observed distributed amounts divided by capital, one result per purchase."""
+    purchases, rentals = data['compras'], data['alquiler']
+    counts = defaultdict(int)
+    for row in purchases['rows']:
+        counts[row[0].strip()] += 1
+    groups = defaultdict(list)
+    for row in rentals['rows']:
+        key = row[0].split('#', 1)[0].strip()
+        if key:
+            groups[key].append(row)
+    capital_index = purchases['headers'].index('capital') if 'capital' in purchases['headers'] else None
+    amount_index = rentals['headers'].index('distributed') if 'distributed' in rentals['headers'] else None
+    ranked = []
+    for record, row in enumerate(purchases['rows'], 1):
+        key = row[0].strip()
+        reasons = []
+        capital = number(row[capital_index]) if capital_index is not None else None
+        if capital is None or capital <= 0:
+            reasons.append('Capital ausente, no numérico o no positivo: porcentaje no disponible.')
+        amount = None
+        if not key:
+            reasons.append('Identificador vacío: no se pueden relacionar los rendimientos.')
+        elif counts[key] > 1:
+            reasons.append('Identificador repetido en compras: no se puede atribuir el rendimiento a una sola compra.')
+        elif amount_index is None:
+            reasons.append('Falta cargar alquileres con la columna distributed.')
+        elif not groups[key]:
+            reasons.append('Sin registros de alquiler relacionados.')
+        else:
+            values = [number(r[amount_index]) for r in groups[key]]
+            if all(value is not None for value in values):
+                amount = sum(values, Decimal(0))
+            else:
+                reasons.append('Hay importes distributed vacíos o no numéricos.')
+        percentage = amount / capital * Decimal(100) if amount is not None and capital is not None and capital > 0 else None
+        ranked.append({'record': record, 'key': key, 'amount': amount, 'percentage': percentage,
+                       'reason': ' '.join(reasons)})
+    ranked.sort(key=lambda item: (item['percentage'] is None,
+                                  -(item['percentage'] if item['percentage'] is not None else Decimal(0)),
+                                  item['record']))
+    return [{'record': item['record'], 'key': item['key'],
+             'amount': str(item['amount']) if item['amount'] is not None else None,
+             'percentage': str(item['percentage']) if item['percentage'] is not None else None,
+             'reason': item['reason']} for item in ranked]

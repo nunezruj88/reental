@@ -7,7 +7,7 @@ document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>show(b.dataset
 document.querySelector('.brand').onclick=()=>show('dashboard');
 async function api(url,options){const r=await fetch(url,options);let value;try{value=await r.json();}catch{throw Error('No se pudo procesar la respuesta del servidor.');}if(!r.ok)throw Error(value.error||'Error al cargar los datos.');return value;}
 function bar(target,label,value,total){const row=el('div',undefined,'bar-row'),line=el('div',undefined,'bar-label');line.append(el('span',label),el('strong',fmt(value)));const p=el('progress');p.max=Math.max(1,total);p.value=value;p.setAttribute('aria-label',`${label}: ${value}`);row.append(line,p);target.append(row);}
-function render(){ renderMaturities(); renderPortfolio(); renderOrphans(); renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('kpis').replaceChildren();for(const [label,n,note] of [['Registros de compras',s.purchases,`${fmt(s.unique)} claves únicas`],['Registros de alquiler',s.rentals,'Filas originales del archivo'],['Alquileres relacionados',s.matched,`${s.rentals?Math.round(s.matched/s.rentals*100):0}% del total`],['Claves sin alquiler',s.withoutRentals,'Identificadores de compras']]){const card=el('div',undefined,'kpi');card.append(el('span',label),el('strong',fmt(n)),el('small',note));$('kpis').append(card);}$('topChart').replaceChildren();s.top.forEach(r=>bar($('topChart'),r.key,r.count,s.top[0].count));if(!s.top.length)$('topChart').append(el('p','Sin registros con identificador.'));$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
+function render(){ renderPurchaseReturns(); renderMaturities(); renderPortfolio(); renderOrphans(); renderFinancial(); $('empty').hidden=!!data;$('insights').hidden=!data;if(!data)return;$('updated').textContent='Actualizado: '+new Date(data.updated).toLocaleString('es-ES');const s=data.summary;$('kpis').replaceChildren();for(const [label,n,note] of [['Registros de compras',s.purchases,`${fmt(s.unique)} claves únicas`],['Registros de alquiler',s.rentals,'Filas originales del archivo'],['Alquileres relacionados',s.matched,`${s.rentals?Math.round(s.matched/s.rentals*100):0}% del total`],['Claves sin alquiler',s.withoutRentals,'Identificadores de compras']]){const card=el('div',undefined,'kpi');card.append(el('span',label),el('strong',fmt(n)),el('small',note));$('kpis').append(card);}$('warnings').replaceChildren(el('p',`${fmt(s.duplicateKeys)} claves repetidas en compras · ${fmt(s.emptyKeys)} registros con clave vacía · ${fmt(s.unmatched)} alquileres sin relación. Las coincidencias se muestran como grupos, sin duplicar filas ni importes.`));}
 function getKey(row,source){return(source==='alquiler'?row[0].split('#')[0]:row[0]).trim();}
 function table(headers,rows,source,actions=true){const t=el('table'),head=el('thead'),tr=el('tr');headers.forEach(h=>tr.append(el('th',h)));if(actions)tr.append(el('th','Relación'));head.append(tr);const body=el('tbody');rows.forEach(row=>{const r=el('tr');row.forEach((v,i)=>{const display=displayValue(headers[i],v);const c=el('td',display);c.title=display;r.append(c);});if(actions){const c=el('td'),b=el('button','Ver relación');b.onclick=()=>{show('detail');related(getKey(row,source));};c.append(b);r.append(c);}body.append(r);});t.append(head,body);return t;}
 function renderTable(){const source=$('source').value;$('table').replaceChildren();if(!data){$('schema').textContent='Carga un CSV de inversiones o rendimientos para explorar los registros.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const d=data[source];if(!d.headers.length){$('schema').textContent='Todavía no has cargado este archivo.';$('pageLabel').textContent='Sin datos';$('prev').disabled=$('next').disabled=true;return;}const q=$('search').value.toLocaleLowerCase(),rows=d.rows.filter(r=>r.some(v=>v.toLocaleLowerCase().includes(q)));const pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages-1);$('schema').textContent=`${d.headers.length} columnas · ${fmt(rows.length)} registros · ${d.encoding}`;$('table').append(table(d.headers,rows.slice(page*50,page*50+50),source));$('pageLabel').textContent=`Página ${page+1} de ${pages}`;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;}
@@ -211,4 +211,32 @@ function renderMaturities(){
    return wrap;
   });
  }
+}
+
+function renderPurchaseReturns(){
+ const chart=$('purchaseReturnsChart');chart.replaceChildren();
+ if(!data)return;
+ const items=data.purchaseReturns||[];
+ if(!items.length){chart.append(el('p','Carga el archivo de compras para ver sus rendimientos.'));return;}
+ const max=Math.max(1,...items.map(item=>Math.abs(Number(item.percentage))));
+ const percent=value=>value===null?'No disponible':new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))+' %';
+ chart.append(el('p',fmt(items.length)+' compras · Los porcentajes no disponibles aparecen al final.'));
+ pagedMaturities(chart,items,rows=>{
+  const list=el('ol',undefined,'purchase-returns');
+  for(const item of rows){
+   const row=el('li'),heading=el('div',undefined,'bar-label');
+   heading.append(el('strong',item.key||'Compra sin identificador'),el('strong',percent(item.percentage)));
+   row.append(heading,el('p',amount(item.amount)+' · Registro '+item.record));
+   if(item.percentage!==null){
+    const value=Number(item.percentage),track=el('div',undefined,'return-track'),fill=el('div',undefined,value<0?'return-fill negative':'return-fill');
+    track.setAttribute('role','img');track.setAttribute('aria-label','Rendimiento: '+percent(item.percentage)+' · '+amount(item.amount));
+    fill.style.width=(Math.abs(value)/max*50)+'%';
+    fill.style.left=(value<0?50-Math.abs(value)/max*50:50)+'%';
+    track.append(fill);row.append(track);
+   }
+   if(item.reason)row.append(el('p',item.reason,'muted'));
+   list.append(row);
+  }
+  return list;
+ });
 }
