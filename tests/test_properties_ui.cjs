@@ -42,9 +42,10 @@ test('cards preserve source estimates, capital, dates and country',()=>{
  vm.runInContext('data=fixture;renderProperties()',s.context);
  const card=s.context.document.getElementById('propertyCards').children[0].children[0].children[0];
  assert.equal(card.children[0].children[0].textContent,'REENTAL-CAR-1');
- assert.equal(card.children[0].children[1].textContent,'México');
+ assert.equal(card.children[0].children[1].textContent,'🇲🇽');
+ assert.equal(card.children[0].children[1].attributes['aria-label'],'México');
  assert.equal(card.children[1].children[0].children[0].textContent,'Caribe 1');
- assert.match(card.children[1].children[0].children[1].textContent,/2659,60|2.659,60/);
+ assert.match(card.children[1].children[0].children[1].children[0].children[1].textContent,/2659,60|2.659,60/);
  const details=card.children[2].children;
  assert.equal(details[0].children[1].textContent,'30 meses');
  assert.equal(details[1].children[1].textContent,'25 %');
@@ -58,7 +59,7 @@ test('missing fields are explicit and untrusted content stays as text',()=>{
  const card=s.context.document.getElementById('propertyCards').children[0].children[0].children[0];
  assert.equal(card.children[0].children[0].textContent,'<img src=x onerror=alert(1)>');
  assert.equal(card.children[0].children[0].children.length,0);
- assert.equal(card.children[1].children[0].children[1].textContent,'No disponible');
+ assert.equal(card.children[1].children[0].children[1].children[0].children[1].textContent,'No disponible');
  assert.equal(card.children[2].children[0].children[1].textContent,'No disponible');
  assert.equal(vm.runInContext("propertyImageURL('javascript:alert(1)')",s.context),'');
  assert.equal(vm.runInContext("propertyImageURL('https://example.com/photo.jpg')",s.context),'https://example.com/photo.jpg');
@@ -84,4 +85,27 @@ test('sidebar restores the saved collapsed preference and persists toggles',()=>
  s.context.document.getElementById('menuToggle').onclick();
  assert.equal(sidebar.hidden,false);
  assert.equal(vm.runInContext("localStorage.getItem('reental.sidebarCollapsed')",s.context),'false');
+});
+
+test('flags accept accented names, English, codes and Global, with readable country labels',()=>{
+ const s=setup();
+ for(const [name,symbol] of [['México','🇲🇽'],['España','🇪🇸'],['United States','🇺🇸'],['MX','🇲🇽'],['  Global  ','🌐'],['país desconocido','país desconocido']]){
+  s.context.country=name;
+  assert.equal(vm.runInContext('propertyCountrySymbol(country)',s.context),symbol);
+ }
+});
+test('cards use accumulated returns by record, including explicit zero, negative and unavailable amounts',()=>{
+ const s=setup();
+ s.context.fixture={compras:{headers:['id','capital','pais'],rows:[['A','100','Global'],['A','200','España'],['C','300','México'],['D','400','']]},
+ purchaseReturns:[{record:1,key:'A',amount:'12.34'},{record:2,key:'A',amount:'0'},{record:3,key:'C',amount:'-5.50'},{record:4,key:'D',amount:null,reason:'Sin registros relacionados'}]};
+ vm.runInContext('data=fixture;renderProperties()',s.context);
+ const cards=s.context.document.getElementById('propertyCards').children[0].children[0].children;
+ const money=card=>card.children[1].children[0].children[1];
+ assert.match(money(cards[0]).children[1].children[1].textContent,/12,34/);
+ assert.match(money(cards[1]).children[1].children[1].textContent,/0,00/);
+ assert.match(money(cards[2]).children[1].children[1].textContent,/-5,50/);
+ assert.equal(money(cards[3]).children[1].children[1].textContent,'No disponible');
+ assert.equal(money(cards[3]).children[1].title,'Sin registros relacionados');
+ assert.equal(cards[0].children[0].children[1].textContent,'🌐');
+ assert.equal(cards[0].children[0].children[1].title,'Global');
 });

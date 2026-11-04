@@ -301,14 +301,39 @@ function propertyValue(headers,row,names){
 function propertyImageURL(value){
  try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password?url.href:'';}catch{return '';}
 }
-function propertyCard(headers,row,record){
+
+let propertyCountryNames;
+function propertyCountrySymbol(country){
+ const normalize=value=>value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ');
+ const name=normalize(country);
+ if(['global','mundial','world','worldwide','internacional'].includes(name))return '🌐';
+ if(!name)return '🌐';
+ if(!propertyCountryNames){
+  propertyCountryNames=new Map();
+  const codes='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.split(' ');
+  for(const code of codes)propertyCountryNames.set(code.toLowerCase(),code);
+  if(typeof Intl.DisplayNames==='function'){
+   for(const locale of ['es','en']){
+    const names=new Intl.DisplayNames([locale],{type:'region'});
+    for(const code of codes)propertyCountryNames.set(normalize(names.of(code)),code);
+   }
+  }
+  for(const [alias,code] of Object.entries({mexico:'MX',espana:'ES','estados unidos':'US',eeuu:'US','ee.uu.':'US',usa:'US','united states of america':'US',uk:'GB','reino unido':'GB','republica dominicana':'DO',panama:'PA',colombia:'CO',argentina:'AR',brasil:'BR',peru:'PE',chile:'CL',ecuador:'EC'}))propertyCountryNames.set(alias,code);
+ }
+ const code=propertyCountryNames.get(name);
+ return code?String.fromCodePoint(...[...code].map(letter=>127397+letter.charCodeAt(0))):country;
+}
+
+function propertyCard(headers,row,record,performance){
  const value=(...names)=>propertyValue(headers,row,names);
  const key=row[0]?.trim()||'Sin identificador';
  const title=value('nombre','inmueble','immueble','titulo')||key;
  const country=value('pais');
  const card=el('article',undefined,'property-card');
  const badge=el('div',undefined,'property-badge');
- badge.append(el('span',key),el('span',country||'País no informado'));
+ const countryBadge=el('span',propertyCountrySymbol(country),'property-country');
+ countryBadge.title=country||'País no informado';countryBadge.setAttribute('role','img');countryBadge.setAttribute('aria-label',country||'País no informado');
+ badge.append(el('span',key),countryBadge);
  const hero=el('div',undefined,'property-hero');
  const photo=propertyImageURL(value('imagen','foto','image','image_url','url imagen'));
  if(photo){
@@ -318,7 +343,14 @@ function propertyCard(headers,row,record){
  const headline=el('div',undefined,'property-headline');
  const capital=value('capital');
  const capitalNumber=/^[+-]?\d+(?:[.,]\d+)?$/.test(capital)?capital.replace(',','.'):null;
- headline.append(el('h2',title),el('strong',amount(capitalNumber)),el('span','Capital invertido · USD'));
+ const money=el('div',undefined,'property-money');
+ for(const [label,total] of [['Capital invertido',capitalNumber],['Rendimiento acumulado',performance?.amount]]){
+  const metric=el('div');
+  metric.append(el('span',label),el('strong',amount(total)));
+  if(label==='Rendimiento acumulado'&&performance?.reason)metric.title=performance.reason;
+  money.append(metric);
+ }
+ headline.append(el('h2',title),money);
  hero.append(headline);
  const details=el('dl',undefined,'property-details');
  const period=value('periodo'),start=value('inicio rendimiento','inicio rendimientos');
@@ -348,9 +380,10 @@ function renderProperties(){
  const records=purchases.rows.map((row,index)=>({row,record:index+1})).filter(item=>item.row.some(value=>value.toLocaleLowerCase('es').includes(query)));
  $('propertyCount').textContent=fmt(records.length)+' fichas · Cada registro de compras conserva su propia ficha.';
  if(!records.length){target.append(el('p','No hay inmuebles que coincidan con tu búsqueda.'));return;}
+ const performanceByRecord=new Map((data.purchaseReturns||[]).map(item=>[item.record,item]));
  pagedMaturities(target,records,items=>{
   const grid=el('div',undefined,'property-grid');
-  for(const item of items)grid.append(propertyCard(purchases.headers,item.row,item.record));
+  for(const item of items)grid.append(propertyCard(purchases.headers,item.row,item.record,performanceByRecord.get(item.record)));
   return grid;
  });
 }
