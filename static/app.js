@@ -363,7 +363,15 @@ function propertyCard(headers,row,record,performance){
   const item=el('div');item.append(el('dt',label),el('dd',text));details.append(item);
  }
  const footer=el('div',undefined,'property-footer');
- footer.append(el('span',value('rendimiento')||'Tipo de rendimiento no informado'),el('small','Registro '+record));
+ const yieldLine=el('div',undefined,'property-yield');
+ const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ for(const [name,text] of Object.entries({viewBox:'0 0 24 24',width:'16',height:'16',fill:'none',stroke:'currentColor','stroke-width':'1.8','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false'}))icon.setAttribute(name,text);
+ for(const d of ['M21 12a9 9 0 0 0-15.9-5.7L3 9','M3 3v6h6','M3 12a9 9 0 0 0 15.9 5.7L21 15','M15 15h6v6']){
+  const path=document.createElementNS(icon.namespaceURI,'path');path.setAttribute('d',d);icon.append(path);
+ }
+ const kind=value('rendimiento');
+ const label=kind?(/^rendimiento\b/i.test(kind)?kind:'Rendimiento '+kind.toLocaleLowerCase('es')):'Rendimiento no informado';
+ yieldLine.append(icon,el('span',label));footer.append(yieldLine);
  const button=el('button','Ver registros relacionados');
  button.type='button';button.onclick=()=>{show('detail');related(row[0]?.trim()||'');};footer.append(button);
  card.append(badge,hero,details,footer);return card;

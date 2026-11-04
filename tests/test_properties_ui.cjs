@@ -17,6 +17,7 @@ function setup(storedValue=null){
  const document={
   getElementById(id){if(!elements.has(id))elements.set(id,new Element());return elements.get(id);},
   createElement:tag=>new Element(tag),
+  createElementNS:(ns,tag)=>{const node=new Element(tag);node.namespaceURI=ns;return node;},
   querySelectorAll:()=>[],
   querySelector:()=>new Element()
  };
@@ -51,6 +52,12 @@ test('cards preserve source estimates, capital, dates and country',()=>{
  assert.equal(details[1].children[1].textContent,'25 %');
  assert.equal(details[2].children[1].textContent,'10 %');
  assert.equal(details[3].children[1].textContent,'23/01/27');
+ const footer=card.children[3];
+ assert.equal(footer.children[0].className,'property-yield');
+ assert.equal(footer.children[0].children[1].textContent,'Rendimiento mensual');
+ assert.equal(footer.children[0].children[0].attributes['aria-hidden'],'true');
+ assert.equal(footer.children.some(node=>node.tag==='small'),false);
+ assert.equal(footer.children[1].textContent,'Ver registros relacionados');
 });
 test('missing fields are explicit and untrusted content stays as text',()=>{
  const s=setup();
