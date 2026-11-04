@@ -7,6 +7,9 @@ Aplicación para un LXC Linux con Nginx, accesible desde la red local en **http:
 - Resumen responsive con recuentos, cobertura de relaciones y ranking por número de registros de alquiler.
 - Carga independiente de inversiones y rendimientos; cada importación sustituye solo su tipo de registros en SQLite y conserva el otro archivo. Ante errores de validación se conservan todos los datos.
 - Explorador con todas las columnas originales, búsqueda, paginación y grupos de registros relacionados.
+- Menú que se puede ocultar y mostrar; recuerda la preferencia en el navegador.
+- Sección Inmuebles con fichas de las compras, búsqueda y paginación. Muestra nombre, país, capital, periodo, rentabilidades estimadas de origen, inicio de renta y tipo de rendimiento. Las rentabilidades conservan el valor y la unidad del CSV.
+- Fichas: nombre desde `nombre`, `inmueble`, `immueble` o `titulo`; portada opcional desde `imagen`, `foto`, `image`, `image_url` o `url imagen` con URL HTTPS. Las imágenes no disponibles usan una portada neutra. Los importes toman `capital`; la rentabilidad total toma `rentabilidad total estimada` o `retorno total`, y la anual toma `rentabilidad anual estimada` o `retorno total anualizado`. Cada registro mantiene su propia ficha y permite abrir sus registros relacionados.
 - Compras: clave de primera columna. Alquiler: texto anterior al primer `#` de primera columna. Se recortan espacios exteriores, se conservan ceros iniciales y mayúsculas. Las claves vacías no coinciden. Los duplicados se muestran y no multiplican los recuentos.
 - UTF-8/BOM o Windows-1252, separadores `, ; TAB |`, valores entrecomillados y multilínea. Se exige cabecera única y no vacía. Máximo 10 MB, 50.000 filas y 150 columnas por archivo.
 - Persistencia del último conjunto válido; no incluye histórico de importaciones ni cuentas individuales. El acceso compartido se protege con contraseña en Nginx.

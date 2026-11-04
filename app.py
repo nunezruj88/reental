@@ -150,7 +150,7 @@ def application(env, start_response):
         traceback.print_exc()
         status, result = '500 Internal Server Error', {'error': 'No se pudo completar la operación. Los datos anteriores se conservan.'}
     body = result if isinstance(result, bytes) else json.dumps(result, ensure_ascii=False).encode()
-    start_response(status, [('Content-Type', mime), ('Content-Length', str(len(body))), ('Cache-Control', 'no-store'), ('X-Content-Type-Options', 'nosniff'), ('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")])
+    start_response(status, [('Content-Type', mime), ('Content-Length', str(len(body))), ('Cache-Control', 'no-store'), ('X-Content-Type-Options', 'nosniff'), ('Content-Security-Policy', "default-src 'self'; img-src 'self' https:; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")])
     return [body]
 
 
